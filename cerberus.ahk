@@ -27,19 +27,9 @@ global OVERLAY_TIMEOUT := 0 ; Time in ms before overlay fades (0 for persistent 
 global OVERLAY_OPACITY := 220 ; 0-255 (0 = transparent, 255 = opaque)
 global OVERLAY_POSITION := "BottomRight" ; TopLeft, TopRight, BottomLeft, BottomRight
 
-; ====== Initialization ======
-; Create a simple message box to indicate script has started
-MsgBox("Cerberus Workspace Manager starting..."
-      "`nPress OK to continue"
-      "`nPress Ctrl+1 through Ctrl+9 to switch workspaces"
-      "`nPress Ctrl+0 to toggle overlays", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
+; ====== Function Definitions ======
 
-CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
-SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations
-DetectHiddenWindows(False) ; Disables detection of hidden windows so they won't be tracked by the script
-
-InitializeWorkspaces() ; Call to initialize workspaces when script starts - sets up monitor-workspace mapping and assigns windows
-InitializeOverlays() ; Create workspace overlay displays - adds visual indicators for workspace numbers
+; ----- Core System Functions -----
 
 InitializeWorkspaces() {
     OutputDebug("============ INITIALIZING WORKSPACES ============")
@@ -115,9 +105,8 @@ InitializeWorkspaces() {
     TrayTip("Cerberus initialized", "Assigned " assignedCount " windows to workspaces") ; Shows notification in system tray
 }
 
-; ====== Helper Functions ======
 IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
-    if !WinExist(hwnd) ; Checks if window exists
+    if !WinExist(hwnd) ; Verifies if the window handle is still valid and references an existing window
         return false
     
     ; Get window information
@@ -150,7 +139,7 @@ IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
     
     ; Skip child windows
     WS_CHILD := 0x40000000
-    style := WinGetStyle(hwnd)
+    style := WinGetStyle(hwnd) ; Retrieves window style flags that define window characteristics
     if (style & WS_CHILD)
         return false
     
@@ -550,45 +539,27 @@ monitorForWorkspace(workspaceID) { ; Finds which monitor is displaying the speci
     return 1 ; Default to primary monitor if not found
 }
 
-; ====== Keyboard Shortcuts ======
-; Ctrl+1 through Ctrl+9 for switching workspaces
-^1::SwitchToWorkspace(1) ; Ctrl+1 hotkey to switch to workspace 1
-^2::SwitchToWorkspace(2) ; Ctrl+2 hotkey to switch to workspace 2
-^3::SwitchToWorkspace(3) ; Ctrl+3 hotkey to switch to workspace 3
-^4::SwitchToWorkspace(4) ; Ctrl+4 hotkey to switch to workspace 4
-^5::SwitchToWorkspace(5) ; Ctrl+5 hotkey to switch to workspace 5
-^6::SwitchToWorkspace(6) ; Ctrl+6 hotkey to switch to workspace 6
-^7::SwitchToWorkspace(7) ; Ctrl+7 hotkey to switch to workspace 7
-^8::SwitchToWorkspace(8) ; Ctrl+8 hotkey to switch to workspace 8
-^9::SwitchToWorkspace(9) ; Ctrl+9 hotkey to switch to workspace 9
-
-; Ctrl+0 to toggle workspace overlays
-^0::ToggleOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays
-
-; ====== Window Event Handlers ======
-; Track window move/resize events to update layouts
-OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE - Registers a handler for window move events
-OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE - Registers a handler for window resize events
+; ----- Event Handlers -----
 
 WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resize events to update saved layouts
     ; Skip invalid windows
     if (!IsWindowValid(hwnd))
         return
-
+        
     ; Get window state
     winState := WinGetMinMax(hwnd)
     title := WinGetTitle(hwnd)
-
+    
     ; Check if window is minimized
     if (winState = -1) { ; Window is minimized
         ; Check if window is assigned to a workspace
         if (WindowWorkspaces.Has(hwnd)) {
             workspaceID := WindowWorkspaces[hwnd]
-
+            
             ; Get the active monitor and its workspace
             activeMonitor := GetActiveMonitor()
             activeWorkspaceID := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 1
-
+            
             ; If window belongs to the currently active workspace, set it to workspace 0 (unassigned)
             if (workspaceID = activeWorkspaceID) {
                 WindowWorkspaces[hwnd] := 0
@@ -597,47 +568,47 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
         }
         return
     }
-
+    
     ; Handle window un-minimization (going from minimized to normal state)
     static lastWindowState := Map() ; Static map to track previous window states
-
+    
     ; Check if we're tracking this window already
     if (!lastWindowState.Has(hwnd))
         lastWindowState[hwnd] := -999 ; Initialize with invalid state value
-
+        
     ; Detect un-minimization (from minimized to normal/maximized)
     if (lastWindowState[hwnd] = -1 && winState != -1) {
         ; Window was just un-minimized, assign to monitor's workspace
         windowMonitor := GetWindowMonitor(hwnd)
-
+        
         if (MonitorWorkspaces.Has(windowMonitor)) {
             newWorkspaceID := MonitorWorkspaces[windowMonitor]
-
+            
             ; Update workspace assignment
             prevWorkspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
-
+            
             if (prevWorkspaceID != newWorkspaceID) {
                 WindowWorkspaces[hwnd] := newWorkspaceID
                 OutputDebug("Window un-minimized, reassigned from workspace " prevWorkspaceID " to " newWorkspaceID ": " title)
             }
         }
     }
-
+    
     ; Update last known state
     lastWindowState[hwnd] := winState
-
+    
     ; For moved/resized windows, update workspace assignment based on monitor
     if (msg = 0x0003 || msg = 0x0005) { ; WM_MOVE or WM_SIZE
         ; Get current monitor and workspace assignment
         windowMonitor := GetWindowMonitor(hwnd)
-
+        
         if (MonitorWorkspaces.Has(windowMonitor)) {
             currentMonitorWorkspace := MonitorWorkspaces[windowMonitor]
-
+            
             ; Only update if window has a workspace assigned
             if (WindowWorkspaces.Has(hwnd)) {
                 currentWindowWorkspace := WindowWorkspaces[hwnd]
-
+                
                 ; If window's workspace doesn't match its monitor's workspace, update it
                 if (currentWindowWorkspace != currentMonitorWorkspace && currentWindowWorkspace != 0) {
                     WindowWorkspaces[hwnd] := currentMonitorWorkspace
@@ -646,7 +617,7 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
             }
         }
     }
-
+    
     ; Save layout if window has a valid workspace assignment
     if (WindowWorkspaces.Has(hwnd)) {
         workspaceID := WindowWorkspaces[hwnd]
@@ -654,10 +625,6 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
             SaveWindowLayout(hwnd, workspaceID)
     }
 }
-
-; Track new window events to assign to current workspace
-; This event provides an hwnd when a window is created
-OnMessage(0x0001, NewWindowHandler)  ; WM_CREATE - Registers a handler for window creation events
 
 NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events to assign new windows
     ; Give the window a moment to initialize fully before assigning
@@ -710,7 +677,8 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace
     }
 }
 
-; ====== Workspace Overlay Functions ======
+; ----- Overlay Functions -----
+
 InitializeOverlays() { ; Creates and displays workspace number indicators on all monitors
     ; Create an overlay for each monitor
     monitorCount := MonitorGetCount() ; Gets the total number of physical monitors to determine which monitor contains the window
@@ -838,3 +806,42 @@ ToggleOverlays() { ; Toggles visibility of workspace indicators
     
     isVisible := !isVisible
 }
+
+; ====== Initialization ======
+; Create a simple message box to indicate script has started
+MsgBox("Cerberus Workspace Manager starting..."
+      "`nPress OK to continue"
+      "`nPress Ctrl+1 through Ctrl+9 to switch workspaces"
+      "`nPress Ctrl+0 to toggle overlays", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
+
+CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
+SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations
+DetectHiddenWindows(False) ; Disables detection of hidden windows so they won't be tracked by the script
+
+; ====== Start Cerberus ======
+InitializeWorkspaces() ; Call to initialize workspaces when script starts - sets up monitor-workspace mapping and assigns windows
+InitializeOverlays() ; Create workspace overlay displays - adds visual indicators for workspace numbers
+
+; ====== Keyboard Shortcuts ======
+; Ctrl+1 through Ctrl+9 for switching workspaces
+^1::SwitchToWorkspace(1) ; Ctrl+1 hotkey to switch to workspace 1
+^2::SwitchToWorkspace(2) ; Ctrl+2 hotkey to switch to workspace 2
+^3::SwitchToWorkspace(3) ; Ctrl+3 hotkey to switch to workspace 3
+^4::SwitchToWorkspace(4) ; Ctrl+4 hotkey to switch to workspace 4
+^5::SwitchToWorkspace(5) ; Ctrl+5 hotkey to switch to workspace 5
+^6::SwitchToWorkspace(6) ; Ctrl+6 hotkey to switch to workspace 6
+^7::SwitchToWorkspace(7) ; Ctrl+7 hotkey to switch to workspace 7
+^8::SwitchToWorkspace(8) ; Ctrl+8 hotkey to switch to workspace 8
+^9::SwitchToWorkspace(9) ; Ctrl+9 hotkey to switch to workspace 9
+
+; Ctrl+0 to toggle workspace overlays
+^0::ToggleOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays
+
+; ====== Register Event Handlers ======
+; Track window move/resize events to update layouts
+OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE - Registers a handler for window move events
+OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE - Registers a handler for window resize events
+
+; Track new window events to assign to current workspace
+; This event provides an hwnd when a window is created
+OnMessage(0x0001, NewWindowHandler)  ; WM_CREATE - Registers a handler for window creation events

@@ -385,6 +385,9 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
 
 ; ----- Event Handlers -----
 SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
+    ; Reference global variables
+    global SWITCH_IN_PROGRESS, DEBUG_MODE, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
+
     ; Early exit conditions
     if (requestedID < 1 || requestedID > MAX_WORKSPACES)
         return
@@ -665,6 +668,9 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
 }
 ; Clean up stale window references to prevent memory leaks
 CleanupWindowReferences() {
+    ; Reference global variables
+    global DEBUG_MODE, WindowWorkspaces, WorkspaceLayouts
+
     ; Clean up lastWindowState map if it exists in the WindowMoveResizeHandler function
     staleCount := 0
     
@@ -735,6 +741,9 @@ CleanupWindowReferences() {
 }
 
 WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resize events to update saved layouts
+    ; Reference global variables
+    global SWITCH_IN_PROGRESS, DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
+
     ; Skip if switch is in progress to avoid recursive operations
     if (SWITCH_IN_PROGRESS) {
         if (DEBUG_MODE)
@@ -831,6 +840,9 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
 }
 
 NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events to assign new windows
+    ; Reference global variables
+    global SWITCH_IN_PROGRESS, DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces
+
     ; Skip if switch is in progress to avoid recursive operations
     if (SWITCH_IN_PROGRESS) {
         if (DEBUG_MODE)
@@ -885,6 +897,9 @@ NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events t
 }
 
 AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed follow-up check)
+    ; Reference global variables
+    global DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces
+
     ; Check again if the window exists and is valid - it might have closed already
     if (!IsWindowValid(hwnd))
         return
@@ -977,6 +992,9 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
 ; ----- Overlay Functions -----
 
 InitializeOverlays() { ; Creates and displays workspace number indicators on all monitors
+    ; Reference global variables
+    global MonitorWorkspaces, WorkspaceOverlays
+
     ; Create an overlay for each monitor
     monitorCount := MonitorGetCount() ; Gets the total number of physical monitors to determine which monitor contains the window
     
@@ -992,6 +1010,9 @@ InitializeOverlays() { ; Creates and displays workspace number indicators on all
 }
 
 CreateOverlay(monitorIndex) { ; Creates workspace indicator overlay for specified monitor
+    ; Reference global variables
+    global MonitorWorkspaces, WorkspaceOverlays, OVERLAY_SIZE, OVERLAY_MARGIN, OVERLAY_POSITION, OVERLAY_OPACITY
+
     ; Get monitor dimensions
     MonitorGetWorkArea(monitorIndex, &mLeft, &mTop, &mRight, &mBottom) ; Gets coordinates of monitor
     
@@ -1038,19 +1059,25 @@ CreateOverlay(monitorIndex) { ; Creates workspace indicator overlay for specifie
 }
 
 UpdateAllOverlays() { ; Updates all workspace number indicators
+    ; Reference global variables
+    global WorkspaceOverlays
+
     ; Update and show all overlays
     for monitorIndex, overlay in WorkspaceOverlays {
         UpdateOverlay(monitorIndex)
     }
-    
+
     ; No timer needed as we're using persistent overlays
 }
 
 UpdateOverlay(monitorIndex) { ; Updates the workspace indicator for specified monitor
+    ; Reference global variables
+    global MonitorWorkspaces, WorkspaceOverlays, OVERLAY_SIZE
+
     ; Update overlay content to show current workspace ID
     if (!WorkspaceOverlays.Has(monitorIndex))
         return
-        
+
     overlay := WorkspaceOverlays[monitorIndex]
     workspaceID := MonitorWorkspaces.Has(monitorIndex) ? MonitorWorkspaces[monitorIndex] : 0
     
@@ -1080,6 +1107,9 @@ UpdateOverlay(monitorIndex) { ; Updates the workspace indicator for specified mo
 }
 
 HideAllOverlays() { ; Hides all workspace indicators
+    ; Reference global variables
+    global WorkspaceOverlays
+
     ; Hide all overlays
     for monitorIndex, overlay in WorkspaceOverlays {
         overlay.Hide() ; Hides the overlay
@@ -1087,20 +1117,23 @@ HideAllOverlays() { ; Hides all workspace indicators
 }
 
 ToggleOverlays() { ; Toggles visibility of workspace indicators
+    ; Reference global variables
+    global OVERLAY_TIMEOUT
+
     ; Toggle overlay visibility
     static isVisible := true
-    
+
     if (isVisible) {
         HideAllOverlays()
     } else {
         UpdateAllOverlays()
-        
+
         ; Reset hide timer if using timeout
         if (OVERLAY_TIMEOUT > 0) {
             SetTimer(HideAllOverlays, -OVERLAY_TIMEOUT) ; Sets timer to hide overlays after specified delay
         }
     }
-    
+
     isVisible := !isVisible
 }
 

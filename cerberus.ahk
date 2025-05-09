@@ -29,14 +29,14 @@ global OVERLAY_POSITION := "BottomRight" ; TopLeft, TopRight, BottomLeft, Bottom
 
 ; ====== Initialization ======
 ; Create a simple message box to indicate script has started
-MsgBox("Cerberus Workspace Manager starting..." 
+MsgBox("Cerberus Workspace Manager starting..."
       "`nPress OK to continue"
       "`nPress Ctrl+1 through Ctrl+9 to switch workspaces"
-      "`nPress Ctrl+0 to toggle overlays", "Cerberus", "T5")
+      "`nPress Ctrl+0 to toggle overlays", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
 
-CoordMode("Mouse", "Screen") ; Set mouse coordinates to be relative to screen 
-SetWinDelay(50) ; Increase window operation delay for more reliable actions
-DetectHiddenWindows(False) ; Don't track hidden windows
+CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
+SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations
+DetectHiddenWindows(False) ; Disables detection of hidden windows so they won't be tracked by the script
 
 InitializeWorkspaces() ; Call to initialize workspaces when script starts - sets up monitor-workspace mapping and assigns windows
 InitializeOverlays() ; Create workspace overlay displays - adds visual indicators for workspace numbers
@@ -45,8 +45,8 @@ InitializeWorkspaces() {
     OutputDebug("============ INITIALIZING WORKSPACES ============")
     
     ; Initialize monitor workspaces (default: monitor 1 = workspace 1, monitor 2 = workspace 2, etc.)
-    monitorCount := MonitorGetCount()
-    OutputDebug("Detected " monitorCount " monitors")
+    monitorCount := MonitorGetCount() ; Gets the total number of physical monitors connected to the system
+    OutputDebug("Detected " monitorCount " monitors") ; Logs the number of detected monitors to debug output for troubleshooting
     
     loop MAX_MONITORS {
         monitorIndex := A_Index
@@ -61,8 +61,8 @@ InitializeWorkspaces() {
     }
     
     ; Capture all existing windows and assign them to their monitor's workspace
-    DetectHiddenWindows(False) ; Disables detection of hidden windows
-    windows := WinGetList() ; Gets a list of all open windows
+    DetectHiddenWindows(False) ; Turns off detection of hidden windows so only visible windows are captured
+    windows := WinGetList() ; Retrieves an array of all visible window handles (HWND) currently open in the system
     
     OutputDebug("Found " windows.Length " total windows in system")
     windowCount := 0
@@ -72,12 +72,12 @@ InitializeWorkspaces() {
     validWindows := []
     for hwnd in windows {
         windowCount++
-        title := WinGetTitle(hwnd)
-        class := WinGetClass(hwnd)
+        title := WinGetTitle(hwnd) ; Gets the title text from the window's title bar for identification
+        class := WinGetClass(hwnd) ; Gets the window class name which identifies the window type or application
         
         OutputDebug("Checking window - Title: " title ", Class: " class ", hwnd: " hwnd)
         
-        if (IsWindowValid(hwnd)) {
+        if (IsWindowValid(hwnd)) { ; Checks if this window should be tracked (excludes system windows, taskbar, etc.)
             OutputDebug("Window is valid - adding to tracking list")
             validWindows.Push(hwnd)
         }
@@ -86,23 +86,23 @@ InitializeWorkspaces() {
     OutputDebug("Found " validWindows.Length " valid windows to track")
     
     ; Second pass - assign valid windows to workspaces
-    for hwnd in validWindows {
+    for hwnd in validWindows { ; Iterates through the array of window handles that passed validation
         title := WinGetTitle(hwnd)
         class := WinGetClass(hwnd)
         
         ; Check if window is minimized - assign to workspace 0 if it is
-        if (WinGetMinMax(hwnd) = -1) {
+        if (WinGetMinMax(hwnd) = -1) { ; Checks window state: -1=minimized, 0=normal, 1=maximized
             WindowWorkspaces[hwnd] := 0 ; Assigns minimized window to workspace 0 (unassigned)
             OutputDebug("Window is minimized, assigned to workspace 0 (unassigned): " title)
             continue ; Skip to next window
         }
         
         ; Assign the window to its monitor's workspace
-        monitorIndex := GetWindowMonitor(hwnd)
-        workspaceID := MonitorWorkspaces.Has(monitorIndex) ? MonitorWorkspaces[monitorIndex] : 0
-        
-        WindowWorkspaces[hwnd] := workspaceID ; Assigns window to workspace
-        SaveWindowLayout(hwnd, workspaceID) ; Saves the window's position and state
+        monitorIndex := GetWindowMonitor(hwnd) ; Determines which physical monitor contains this window
+        workspaceID := MonitorWorkspaces.Has(monitorIndex) ? MonitorWorkspaces[monitorIndex] : 0 ; Gets workspace ID for this monitor, or 0 if monitor isn't tracked
+
+        WindowWorkspaces[hwnd] := workspaceID ; Adds window to the tracking map with its workspace ID
+        SaveWindowLayout(hwnd, workspaceID) ; Stores window's position, size, and state (normal/maximized) for later restoration
         
         OutputDebug("Assigned window to workspace " workspaceID " on monitor " monitorIndex ": " title)
         assignedCount++
@@ -160,13 +160,13 @@ IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
 }
 
 GetWindowMonitor(hwnd) { ; Determines which monitor contains the window
-    monitorCount := MonitorGetCount() ; Gets the total number of monitors
+    monitorCount := MonitorGetCount() ; Gets the total number of physical monitors to determine which monitor contains the window
     
     if (monitorCount = 1)
         return 1
         
     ; Get window position
-    WinGetPos(&x, &y, &width, &height, hwnd) ; Gets position and size of window
+    WinGetPos(&x, &y, &width, &height, hwnd) ; Retrieves window position and size, storing values in the referenced variables
     
     ; Find which monitor contains the center of the window
     centerX := x + width / 2
@@ -200,9 +200,9 @@ SaveWindowLayout(hwnd, workspaceID) { ; Stores window position and state for lat
         WorkspaceLayouts[workspaceID] := Map() ; Creates new map for this workspace
         
     ; Get window position and state
-    WinGetPos(&x, &y, &width, &height, hwnd) ; Gets position and size of window
-    isMinimized := WinGetMinMax(hwnd) = -1 ; Checks if window is minimized
-    isMaximized := WinGetMinMax(hwnd) = 1 ; Checks if window is maximized
+    WinGetPos(&x, &y, &width, &height, hwnd) ; Captures current window coordinates and dimensions to save in layout
+    isMinimized := WinGetMinMax(hwnd) = -1 ; Determines if window is minimized by checking if WinGetMinMax returns -1
+    isMaximized := WinGetMinMax(hwnd) = 1 ; Determines if window is maximized by checking if WinGetMinMax returns 1
     
     ; Store window layout
     WorkspaceLayouts[workspaceID][hwnd] := { ; Creates layout object for this window
@@ -226,10 +226,10 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
     OutputDebug("Attempting to restore window: " title " (" hwnd ")")
     
     ; First ensure the window is restored from minimized state
-    winState := WinGetMinMax(hwnd) 
-    if (winState = -1) { ; If window is minimized
+    winState := WinGetMinMax(hwnd) ; Gets window state (-1=minimized, 0=normal, 1=maximized)
+    if (winState = -1) { ; If window is currently minimized, restore it first before applying layout
         OutputDebug("Window is minimized, restoring first")
-        WinRestore("ahk_id " hwnd)
+        WinRestore("ahk_id " hwnd) ; Restores window from minimized state so we can apply position/size
         Sleep(100) ; Allow time for the window to restore
     }
     
@@ -242,14 +242,14 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
             OutputDebug("Found saved layout for window: x=" layout.x ", y=" layout.y ", w=" layout.width ", h=" layout.height)
             
             ; Apply saved layout
-            if (layout.isMaximized) {
+            if (layout.isMaximized) { ; If window was previously maximized
                 OutputDebug("Maximizing window")
-                WinMaximize("ahk_id " hwnd)
+                WinMaximize("ahk_id " hwnd) ; Restore window to maximized state
             } else {
                 ; Move window to saved position
-                try {
+                try { ; Try to move window to saved position, might fail if window constraints prevent it
                     OutputDebug("Moving window to saved position")
-                    WinMove(layout.x, layout.y, layout.width, layout.height, "ahk_id " hwnd)
+                    WinMove(layout.x, layout.y, layout.width, layout.height, "ahk_id " hwnd) ; Moves and resizes window to saved position and dimensions
                 } catch Error as err {
                     OutputDebug("ERROR moving window: " err.Message)
                 }
@@ -263,7 +263,7 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
     }
     
     ; Ensure window is visible and brought to front
-    WinActivate("ahk_id " hwnd)
+    WinActivate("ahk_id " hwnd) ; Brings window to foreground and gives it keyboard focus
 }
 
 MinimizeWorkspaceWindows(workspaceID) { ; Minimizes all windows in the specified workspace
@@ -287,9 +287,9 @@ MinimizeWorkspaceWindows(workspaceID) { ; Minimizes all windows in the specified
         if (WindowWorkspaces.Has(hwnd) && WindowWorkspaces[hwnd] = workspaceID && winState != -1) {
             OutputDebug("Minimizing workspace window: " title)
             try {
-                WinMinimize("ahk_id " hwnd)
+                WinMinimize("ahk_id " hwnd) ; Minimizes the window to the taskbar
                 minimizedCount++
-                Sleep(30) ; Small delay between minimize operations
+                Sleep(30) ; Small delay between minimize operations to prevent system overload
             } catch Error as err {
                 OutputDebug("ERROR minimizing window: " err.Message)
             }
@@ -323,8 +323,8 @@ RestoreWorkspaceWindows(workspaceID) { ; Restores all minimized windows for the 
                 if (WorkspaceLayouts.Has(workspaceID) && WorkspaceLayouts[workspaceID].Has(hwnd)) {
                     RestoreWindowLayout(hwnd, workspaceID) ; Restores window with saved layout
                 } else {
-                    WinRestore("ahk_id " hwnd) ; Restores window without layout info
-                    WinActivate("ahk_id " hwnd) ; Make sure it's brought to front
+                    WinRestore("ahk_id " hwnd) ; Restores window from minimized state when no saved layout exists
+                    WinActivate("ahk_id " hwnd) ; Activates the window and brings it to the foreground
                 }
                 restoredCount++
                 Sleep(30) ; Small delay between restore operations
@@ -346,11 +346,11 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     OutputDebug("Switching to workspace: " requestedID)
     
     ; Get active monitor
-    activeMonitor := GetActiveMonitor() ; Gets the monitor with active window
+    activeMonitor := GetActiveMonitor() ; Gets the monitor index that contains the currently active (focused) window
     OutputDebug("Active monitor: " activeMonitor)
     
     ; Get current workspace ID for active monitor
-    currentWorkspaceID := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 1
+    currentWorkspaceID := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 1 ; Gets current workspace ID for active monitor, defaults to 1 if not found
     OutputDebug("Current workspace on active monitor: " currentWorkspaceID)
     
     ; If already on requested workspace, do nothing
@@ -640,7 +640,7 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace
 ; ====== Workspace Overlay Functions ======
 InitializeOverlays() { ; Creates and displays workspace number indicators on all monitors
     ; Create an overlay for each monitor
-    monitorCount := MonitorGetCount() ; Gets the total number of monitors
+    monitorCount := MonitorGetCount() ; Gets the total number of physical monitors to determine which monitor contains the window
     
     loop monitorCount {
         monitorIndex := A_Index

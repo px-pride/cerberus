@@ -231,77 +231,6 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
     WinActivate("ahk_id " hwnd) ; Brings window to foreground and gives it keyboard focus
 }
 
-MinimizeWorkspaceWindows(workspaceID) { ; Minimizes all windows in the specified workspace
-    OutputDebug("Minimizing all windows for workspace " workspaceID)
-    
-    ; Get all open windows
-    windows := WinGetList()
-    minimizedCount := 0
-    
-    ; Process each window
-    for index, hwnd in windows {
-        ; Skip invalid windows
-        if (!IsWindowValid(hwnd))
-            continue
-            
-        ; Get window info
-        title := WinGetTitle(hwnd)
-        winState := WinGetMinMax(hwnd)
-        
-        ; If window belongs to this workspace and isn't already minimized
-        if (WindowWorkspaces.Has(hwnd) && WindowWorkspaces[hwnd] = workspaceID && winState != -1) {
-            OutputDebug("Minimizing workspace window: " title)
-            try {
-                WinMinimize("ahk_id " hwnd) ; Minimizes the window to the taskbar
-                minimizedCount++
-                Sleep(30) ; Small delay between minimize operations to prevent system overload
-            } catch Error as err {
-                OutputDebug("ERROR minimizing window: " err.Message)
-            }
-        }
-    }
-    
-    OutputDebug("Minimized " minimizedCount " windows for workspace " workspaceID)
-}
-
-RestoreWorkspaceWindows(workspaceID) { ; Restores all minimized windows for the specified workspace
-    OutputDebug("Restoring all windows for workspace " workspaceID)
-    
-    ; Get all open windows
-    windows := WinGetList()
-    restoredCount := 0
-    
-    ; Process each window
-    for index, hwnd in windows {
-        ; Skip invalid windows
-        if (!IsWindowValid(hwnd))
-            continue
-            
-        ; Get window info
-        title := WinGetTitle(hwnd)
-        winState := WinGetMinMax(hwnd)
-        
-        ; If window is minimized and belongs to this workspace
-        if (winState = -1 && WindowWorkspaces.Has(hwnd) && WindowWorkspaces[hwnd] = workspaceID) {
-            OutputDebug("Restoring workspace window: " title)
-            try {
-                if (WorkspaceLayouts.Has(workspaceID) && WorkspaceLayouts[workspaceID].Has(hwnd)) {
-                    RestoreWindowLayout(hwnd, workspaceID) ; Restores window with saved layout
-                } else {
-                    WinRestore("ahk_id " hwnd) ; Restores window from minimized state when no saved layout exists
-                    WinActivate("ahk_id " hwnd) ; Activates the window and brings it to the foreground
-                }
-                restoredCount++
-                Sleep(30) ; Small delay between restore operations
-            } catch Error as err {
-                OutputDebug("ERROR restoring window: " err.Message)
-            }
-        }
-    }
-    
-    OutputDebug("Restored " restoredCount " windows for workspace " workspaceID)
-}
-
 SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     if (requestedID < 1 || requestedID > MAX_WORKSPACES)
         return
@@ -504,15 +433,6 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     
     ; Update workspace overlays to reflect the new assignments
     UpdateAllOverlays()
-}
-
-; Helper function to find which monitor a workspace should be on
-monitorForWorkspace(workspaceID) { ; Finds which monitor is displaying the specified workspace
-    for monIndex, wsID in MonitorWorkspaces {
-        if (wsID = workspaceID)
-            return monIndex
-    }
-    return 1 ; Default to primary monitor if not found
 }
 
 ; ----- Event Handlers -----

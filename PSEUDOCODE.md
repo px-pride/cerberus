@@ -183,50 +183,69 @@ END PROCEDURE
 ## Workspace Management
 
 ```
-PROCEDURE MinimizeWorkspaceWindows(workspace_id):
-    windows = GET all open windows
-    
-    FOR each window:
-        IF IsWindowValid(window) AND WindowWorkspaces[window] equals workspace_id AND window is not minimized:
-            MINIMIZE window
-END PROCEDURE
-
-PROCEDURE RestoreWorkspaceWindows(workspace_id):
-    windows = GET all open windows
-    
-    FOR each window:
-        IF IsWindowValid(window) AND window is minimized AND WindowWorkspaces[window] equals workspace_id:
-            IF saved layout exists:
-                RESTORE window with saved layout
-            ELSE:
-                RESTORE window to default state
-                ACTIVATE window
-END PROCEDURE
-
 PROCEDURE SwitchToWorkspace(requested_id):
     IF requested_id is invalid:
         RETURN
-    
+
     active_monitor = GetActiveMonitor()
     current_workspace = MonitorWorkspaces[active_monitor]
-    
+
     IF current_workspace equals requested_id:
         RETURN  // Already on requested workspace
-    
+
     // Check if requested workspace is on another monitor
     other_monitor = FIND monitor displaying requested_id
-    
+
     IF other_monitor exists:
         // Exchange workspaces between monitors
-        MINIMIZE all windows on both monitors
-        SWAP workspace IDs between monitors
-        RESTORE windows on both monitors with updated assignments
+
+        // Step 1: Minimize all windows on both monitors
+        windows = GET all open windows
+        FOR each window:
+            IF IsWindowValid(window) AND (monitor is active_monitor OR monitor is other_monitor):
+                MINIMIZE window
+                DELAY to allow minimize operation to complete
+
+        // Step 2: Swap workspace IDs between monitors
+        MonitorWorkspaces[other_monitor] = current_workspace
+        MonitorWorkspaces[active_monitor] = requested_id
+
+        // Step 3: Restore windows for both workspaces on their new monitors
+        windows = GET all open windows
+        FOR each window:
+            IF IsWindowValid(window):
+                windowMonitor = GetWindowMonitor(window)
+
+                IF windowMonitor equals active_monitor:
+                    SET WindowWorkspaces[window] = requested_id
+                    IF window is minimized:
+                        RESTORE window
+
+                ELSE IF windowMonitor equals other_monitor:
+                    SET WindowWorkspaces[window] = current_workspace
+                    IF window is minimized:
+                        RESTORE window
     ELSE:
-        // Standard workspace switch
-        MINIMIZE all windows on active monitor
+        // Standard workspace switch (no exchange)
+
+        // Step 1: Minimize all windows on active monitor
+        windows = GET all open windows
+        FOR each window:
+            IF IsWindowValid(window) AND monitor is active_monitor:
+                MINIMIZE window
+                DELAY to allow minimize operation to complete
+
+        // Step 2: Update workspace ID for active monitor
         SET MonitorWorkspaces[active_monitor] = requested_id
-        RESTORE windows belonging to requested workspace on active monitor
-    
+
+        // Step 3: Restore windows belonging to requested workspace
+        windows = GET all open windows
+        FOR each window:
+            IF IsWindowValid(window) AND monitor is active_monitor:
+                RESTORE window if needed
+                SET WindowWorkspaces[window] = requested_id
+                SAVE window layout
+
     UPDATE workspace overlays
 END PROCEDURE
 ```

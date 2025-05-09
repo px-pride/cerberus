@@ -2,6 +2,7 @@
 #SingleInstance Force
 
 ; Cerberus - Multi-monitor workspace management system
+; To enable debug mode, change DEBUG_MODE to True below
 
 ; ====== Function Definitions ======
 
@@ -1073,8 +1074,9 @@ MAX_WORKSPACES := 9  ; Maximum number of workspaces (1-9)
 MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
 
 ; ====== Global Variables ======
-; Debug flag (set to True for verbose debug output)
-global DEBUG_MODE := False
+; ===== DEBUG SETTINGS =====
+; Set this to True to enable detailed logging for troubleshooting
+global DEBUG_MODE := False  ; Change to True to enable debugging
 
 ; Monitor workspace assignments (monitor index → workspace ID)
 global MonitorWorkspaces := Map()

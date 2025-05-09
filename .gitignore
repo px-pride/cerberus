@@ -1,0 +1,12 @@
+# Ignore all files
+*
+
+# Except for markdown and AutoHotkey files
+!*.md
+!*.ahk
+
+# Don't ignore .gitignore
+!.gitignore
+
+# Ignore specific patterns within directories
+logs/

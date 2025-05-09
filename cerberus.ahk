@@ -333,106 +333,109 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
 SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     if (requestedID < 1 || requestedID > MAX_WORKSPACES)
         return
-        
+
     ; Debug output to help diagnose issues
-    OutputDebug("------------- WORKSPACE SWITCH START -------------")
-    OutputDebug("Switching to workspace: " requestedID)
-    
+    if (DEBUG_MODE) {
+        OutputDebug("------------- WORKSPACE SWITCH START -------------")
+        OutputDebug("Switching to workspace: " requestedID)
+    }
+
     ; Get active monitor
     activeMonitor := GetActiveMonitor() ; Gets the monitor index that contains the currently active (focused) window
-    OutputDebug("Active monitor: " activeMonitor)
-    
+    if (DEBUG_MODE)
+        OutputDebug("Active monitor: " activeMonitor)
+
     ; Get current workspace ID for active monitor
     currentWorkspaceID := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 1 ; Gets current workspace ID for active monitor, defaults to 1 if not found
-    OutputDebug("Current workspace on active monitor: " currentWorkspaceID)
-    
+    if (DEBUG_MODE)
+        OutputDebug("Current workspace on active monitor: " currentWorkspaceID)
+
     ; If already on requested workspace, do nothing
     if (currentWorkspaceID = requestedID) {
-        OutputDebug("Already on requested workspace. No action needed.")
+        if (DEBUG_MODE)
+            OutputDebug("Already on requested workspace. No action needed.")
         return
     }
-    
+
     ; Check if the requested workspace is already on another monitor - direct swap approach
     otherMonitor := 0
     for monIndex, workspaceID in MonitorWorkspaces {
         if (monIndex != activeMonitor && workspaceID = requestedID) {
             otherMonitor := monIndex
-            OutputDebug("Found requested workspace on monitor: " otherMonitor)
+            if (DEBUG_MODE)
+                OutputDebug("Found requested workspace on monitor: " otherMonitor)
             break
         }
     }
-    
+
     if (otherMonitor > 0) {
         ; === PERFORMING WORKSPACE EXCHANGE BETWEEN MONITORS ===
-        OutputDebug("Performing workspace exchange between monitors " activeMonitor " and " otherMonitor)
-        
+        if (DEBUG_MODE)
+            OutputDebug("Performing workspace exchange between monitors " activeMonitor " and " otherMonitor)
+
         ; Step 1: Minimize all windows on both monitors
         ; Get all open windows
         windows := WinGetList()
-        OutputDebug("Found " windows.Length " total windows")
-        
+        if (DEBUG_MODE)
+            OutputDebug("Found " windows.Length " total windows")
+
         ; Identify and minimize windows on both monitors
         for index, hwnd in windows {
             ; Skip invalid windows
             if (!IsWindowValid(hwnd))
                 continue
-            
+
             ; Get window info
             title := WinGetTitle(hwnd)
             windowMonitor := GetWindowMonitor(hwnd)
-            
+
             ; Check if window is on either the active or other monitor
             if (windowMonitor = activeMonitor || windowMonitor = otherMonitor) {
-                OutputDebug("MINIMIZING window on monitor " windowMonitor ": " title)
-                
+                if (DEBUG_MODE)
+                    OutputDebug("MINIMIZING window on monitor " windowMonitor ": " title)
+
                 ; Force the window to minimize
                 try {
                     WinMinimize("ahk_id " hwnd)
                     Sleep(50) ; Delay to allow minimize operation to complete
                 } catch Error as err {
-                    OutputDebug("ERROR minimizing window: " err.Message)
+                    if (DEBUG_MODE)
+                        OutputDebug("ERROR minimizing window: " err.Message)
                 }
             }
         }
-        
+
         ; Step 2: Swap workspace IDs between monitors
-        OutputDebug("Swapping workspace IDs: " currentWorkspaceID " and " requestedID)
+        if (DEBUG_MODE)
+            OutputDebug("Swapping workspace IDs: " currentWorkspaceID " and " requestedID)
         MonitorWorkspaces[otherMonitor] := currentWorkspaceID
         MonitorWorkspaces[activeMonitor] := requestedID
-        
+
         ; Force a delay to ensure minimizations complete
         Sleep(300)
-        
+
         ; Step 3: Restore windows for both workspaces on their new monitors
         windows := WinGetList() ; Get fresh window list
         restoredActive := 0
         restoredOther := 0
-        
+
         for index, hwnd in windows {
             ; Skip invalid windows
             if (!IsWindowValid(hwnd))
                 continue
-                
-            ; Update window workspace assignment based on monitor it's on
+
+            ; Get window monitor - the WindowMoveResizeHandler will handle workspace assignment automatically
             windowMonitor := GetWindowMonitor(hwnd)
-            
+
             if (windowMonitor = activeMonitor) {
-                ; Set window to requested workspace since it's on active monitor
-                WindowWorkspaces[hwnd] := requestedID
-                OutputDebug("Assigned window to active monitor workspace: " requestedID)
-                
                 ; Restore window if it's minimized
                 if (WinGetMinMax(hwnd) = -1) {
                     WinRestore("ahk_id " hwnd)
                     restoredActive++
                     Sleep(30)
                 }
-            } 
+            }
             else if (windowMonitor = otherMonitor) {
-                ; Set window to current workspace ID since it's on other monitor
-                WindowWorkspaces[hwnd] := currentWorkspaceID
-                OutputDebug("Assigned window to other monitor workspace: " currentWorkspaceID)
-                
                 ; Restore window if it's minimized
                 if (WinGetMinMax(hwnd) = -1) {
                     WinRestore("ahk_id " hwnd)
@@ -441,95 +444,104 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                 }
             }
         }
-        
-        OutputDebug("Restored " restoredActive " windows on active monitor, " restoredOther " on other monitor")
+
+        if (DEBUG_MODE)
+            OutputDebug("Restored " restoredActive " windows on active monitor, " restoredOther " on other monitor")
     }
     else {
         ; === STANDARD WORKSPACE SWITCH (NO EXCHANGE) ===
-        OutputDebug("Standard workspace switch - no exchange needed")
-        
+        if (DEBUG_MODE)
+            OutputDebug("Standard workspace switch - no exchange needed")
+
         ; ====== STEP 1: Identify and minimize all windows on the active monitor ======
         ; Get all open windows
-        windows := WinGetList() ; Gets a list of all open windows    
-        OutputDebug("Found " windows.Length " total windows")
-        
+        windows := WinGetList() ; Gets a list of all open windows
+        if (DEBUG_MODE)
+            OutputDebug("Found " windows.Length " total windows")
+
         ; Process each window
         for index, hwnd in windows {
             ; Skip invalid windows
             if (!IsWindowValid(hwnd))
                 continue
-            
+
             ; Check if window is on active monitor
             windowMonitor := GetWindowMonitor(hwnd)
             if (windowMonitor = activeMonitor) {
                 ; Directly minimize the window on active monitor
                 title := WinGetTitle(hwnd)
-                OutputDebug("MINIMIZING window on active monitor: " title)
-                
+                if (DEBUG_MODE)
+                    OutputDebug("MINIMIZING window on active monitor: " title)
+
                 ; Force the window to minimize
                 try {
                     WinMinimize("ahk_id " hwnd)
                     Sleep(50) ; Delay to allow minimize operation to complete
                 } catch Error as err {
-                    OutputDebug("ERROR minimizing window: " err.Message)
+                    if (DEBUG_MODE)
+                        OutputDebug("ERROR minimizing window: " err.Message)
                 }
             }
         }
-        
+
         ; ====== STEP 2: Change workspace ID for active monitor ======
         ; Update the workspace ID for the active monitor
         MonitorWorkspaces[activeMonitor] := requestedID
-        OutputDebug("Changed active monitor workspace to: " requestedID)
-        
+        if (DEBUG_MODE)
+            OutputDebug("Changed active monitor workspace to: " requestedID)
+
         ; Force a delay to allow minimizations to complete
         Sleep(300)
-        
+
         ; ====== STEP 3: Restore windows belonging to requested workspace ======
         restoreCount := 0
-        
+
         ; Get all windows again (in case things changed)
         windows := WinGetList()
-        
+
         ; Process each window
         for index, hwnd in windows {
             ; Skip invalid windows
             if (!IsWindowValid(hwnd))
                 continue
-                
+
             ; Get window info
             title := WinGetTitle(hwnd)
             windowMonitor := GetWindowMonitor(hwnd)
             winState := WinGetMinMax(hwnd)
-            
-            ; Check if window is minimized and on active monitor
+
+            ; Check if window is on active monitor
             if (windowMonitor = activeMonitor) {
                 ; This is a window that should be restored for the new workspace
-                OutputDebug("RESTORING window for new workspace: " title)
-                
-                ; Force window restore
+                if (DEBUG_MODE)
+                    OutputDebug("RESTORING window for new workspace: " title)
+
+                ; Force window restore - the WindowMoveResizeHandler will handle workspace assignment
                 try {
                     ; Restore from minimized state if needed
                     if (winState = -1) {
                         WinRestore("ahk_id " hwnd)
                     }
-                    
-                    ; Update workspace assignment
-                    WindowWorkspaces[hwnd] := requestedID
+
+                    ; Note: WindowWorkspaces is now updated by event handlers, not directly here
                     SaveWindowLayout(hwnd, requestedID)
-                    
+
                     restoreCount++
                     Sleep(30) ; Delay to allow restore operation to complete
                 } catch Error as err {
-                    OutputDebug("ERROR restoring window: " err.Message)
+                    if (DEBUG_MODE)
+                        OutputDebug("ERROR restoring window: " err.Message)
                 }
             }
         }
-        
-        OutputDebug("Restored " restoreCount " windows for workspace " requestedID)
+
+        if (DEBUG_MODE)
+            OutputDebug("Restored " restoreCount " windows for workspace " requestedID)
     }
-    
-    OutputDebug("------------- WORKSPACE SWITCH END -------------")
-    
+
+    if (DEBUG_MODE)
+        OutputDebug("------------- WORKSPACE SWITCH END -------------")
+
     ; Update workspace overlays to reflect the new assignments
     UpdateAllOverlays()
 }

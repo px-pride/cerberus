@@ -94,6 +94,9 @@ InitializeWorkspaces() {
 }
 
 IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
+    ; Reference global variables
+    global DEBUG_MODE, A_ScriptHwnd
+
     ; Skip invalid handles safely
     try {
         if (!WinExist(hwnd)) ; Verifies if the window handle is still valid and references an existing window
@@ -170,6 +173,9 @@ IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
 }
 
 GetWindowMonitor(hwnd) { ; Determines which monitor contains the window
+    ; Reference global variables
+    global DEBUG_MODE
+
     try {
         monitorCount := MonitorGetCount() ; Gets the total number of physical monitors to determine which monitor contains the window
 
@@ -209,6 +215,9 @@ GetWindowMonitor(hwnd) { ; Determines which monitor contains the window
 }
 
 GetActiveMonitor() { ; Gets the monitor index where the active window is located
+    ; Reference global variables
+    global DEBUG_MODE
+
     try {
         ; Get active window
         activeHwnd := WinExist("A") ; Gets handle of active window

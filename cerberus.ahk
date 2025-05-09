@@ -3,30 +3,6 @@
 
 ; Cerberus - Multi-monitor workspace management system
 
-; ====== Configuration ======
-MAX_WORKSPACES := 9  ; Maximum number of workspaces (1-9)
-MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
-
-; ====== Global Variables ======
-; Monitor workspace assignments (monitor index → workspace ID)
-global MonitorWorkspaces := Map()
-
-; Window workspace assignments (window ID → workspace ID)
-global WindowWorkspaces := Map()
-
-; Window positions per workspace (workspace ID → Map of window layouts)
-global WorkspaceLayouts := Map()
-
-; Workspace overlay GUI handles (monitor index → GUI handle)
-global WorkspaceOverlays := Map()
-
-; Overlay display settings
-global OVERLAY_SIZE := 60 ; Size of overlay in pixels (increased for better visibility)
-global OVERLAY_MARGIN := 20 ; Margin from screen edge
-global OVERLAY_TIMEOUT := 0 ; Time in ms before overlay fades (0 for persistent display)
-global OVERLAY_OPACITY := 220 ; 0-255 (0 = transparent, 255 = opaque)
-global OVERLAY_POSITION := "BottomRight" ; TopLeft, TopRight, BottomLeft, BottomRight
-
 ; ====== Function Definitions ======
 
 ; ----- Core System Functions -----
@@ -806,6 +782,30 @@ ToggleOverlays() { ; Toggles visibility of workspace indicators
     
     isVisible := !isVisible
 }
+
+; ====== Configuration ======
+MAX_WORKSPACES := 9  ; Maximum number of workspaces (1-9)
+MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
+
+; ====== Global Variables ======
+; Monitor workspace assignments (monitor index → workspace ID)
+global MonitorWorkspaces := Map()
+
+; Window workspace assignments (window ID → workspace ID)
+global WindowWorkspaces := Map()
+
+; Window positions per workspace (workspace ID → Map of window layouts)
+global WorkspaceLayouts := Map()
+
+; Workspace overlay GUI handles (monitor index → GUI handle)
+global WorkspaceOverlays := Map()
+
+; Overlay display settings
+global OVERLAY_SIZE := 60 ; Size of overlay in pixels (increased for better visibility)
+global OVERLAY_MARGIN := 20 ; Margin from screen edge
+global OVERLAY_TIMEOUT := 0 ; Time in ms before overlay fades (0 for persistent display)
+global OVERLAY_OPACITY := 220 ; 0-255 (0 = transparent, 255 = opaque)
+global OVERLAY_POSITION := "BottomRight" ; TopLeft, TopRight, BottomLeft, BottomRight
 
 ; ====== Initialization ======
 ; Create a simple message box to indicate script has started

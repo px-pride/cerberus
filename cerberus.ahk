@@ -825,16 +825,12 @@ MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
 ; ====== Global Variables ======
 ; Monitor workspace assignments (monitor index → workspace ID)
 global MonitorWorkspaces := Map()
-
 ; Window workspace assignments (window ID → workspace ID)
 global WindowWorkspaces := Map()
-
 ; Window positions per workspace (workspace ID → Map of window layouts)
 global WorkspaceLayouts := Map()
-
 ; Workspace overlay GUI handles (monitor index → GUI handle)
 global WorkspaceOverlays := Map()
-
 ; Overlay display settings
 global OVERLAY_SIZE := 60 ; Size of overlay in pixels (increased for better visibility)
 global OVERLAY_MARGIN := 20 ; Margin from screen edge
@@ -868,7 +864,6 @@ InitializeOverlays() ; Create workspace overlay displays - adds visual indicator
 ^7::SwitchToWorkspace(7) ; Ctrl+7 hotkey to switch to workspace 7
 ^8::SwitchToWorkspace(8) ; Ctrl+8 hotkey to switch to workspace 8
 ^9::SwitchToWorkspace(9) ; Ctrl+9 hotkey to switch to workspace 9
-
 ; Ctrl+0 to toggle workspace overlays
 ^0::ToggleOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays
 
@@ -876,7 +871,6 @@ InitializeOverlays() ; Create workspace overlay displays - adds visual indicator
 ; Track window move/resize events to update layouts
 OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE - Registers a handler for window move events
 OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE - Registers a handler for window resize events
-
 ; Track new window events to assign to current workspace
 ; This event provides an hwnd when a window is created
 OnMessage(0x0001, NewWindowHandler)  ; WM_CREATE - Registers a handler for window creation events

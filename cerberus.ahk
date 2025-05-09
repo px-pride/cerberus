@@ -571,13 +571,28 @@ OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE - Registers a handler for 
 OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE - Registers a handler for window resize events
 
 WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resize events to update saved layouts
-    ; Don't track minimized windows
-    if (WinGetMinMax(hwnd) = -1) ; Checks if window is minimized
+    ; Check if window is minimized
+    if (WinGetMinMax(hwnd) = -1) { ; Window is minimized
+        ; Check if window is valid and currently assigned to a workspace
+        if (IsWindowValid(hwnd) && WindowWorkspaces.Has(hwnd)) {
+            workspaceID := WindowWorkspaces[hwnd]
+
+            ; Get the active monitor and its workspace
+            activeMonitor := GetActiveMonitor()
+            activeWorkspaceID := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 1
+
+            ; If window belongs to the currently active workspace, set it to workspace 0 (unassigned)
+            if (workspaceID = activeWorkspaceID) {
+                WindowWorkspaces[hwnd] := 0
+                OutputDebug("Window minimized and removed from active workspace: " WinGetTitle(hwnd))
+            }
+        }
         return
-        
+    }
+
     if (IsWindowValid(hwnd) && WindowWorkspaces.Has(hwnd)) { ; Checks if window is valid and has workspace assignment
         workspaceID := WindowWorkspaces[hwnd] ; Gets workspace ID for this window
-        if (workspaceID > 0) 
+        if (workspaceID > 0)
             SaveWindowLayout(hwnd, workspaceID) ; Saves updated window layout
     }
 }

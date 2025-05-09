@@ -603,53 +603,88 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
 }
 
 NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events to assign new windows
-    ; Give the window a moment to initialize fully before assigning
-    ; This helps ensure window properties and position are stable
-    SetTimer(() => AssignNewWindow(hwnd), -1000) ; Increased timer to 1 second for better stability
+    ; First do an immediate check to see if the window is valid and what monitor it's on
+    if (IsWindowValid(hwnd)) {
+        ; Get window monitor and assign to appropriate workspace immediately
+        monitorIndex := GetWindowMonitor(hwnd)
+
+        if (MonitorWorkspaces.Has(monitorIndex)) {
+            workspaceID := MonitorWorkspaces[monitorIndex]
+            title := WinGetTitle(hwnd)
+
+            ; Assign to workspace of monitor it appears on
+            WindowWorkspaces[hwnd] := workspaceID
+            OutputDebug("New window immediately assigned to workspace " workspaceID " on monitor " monitorIndex ": " title)
+
+            ; Save layout and check visibility
+            SaveWindowLayout(hwnd, workspaceID)
+
+            ; Check if this window should be visible or hidden on this monitor
+            currentWorkspaceID := MonitorWorkspaces[monitorIndex]
+            if (workspaceID != currentWorkspaceID) {
+                ; If window belongs to workspace not current on this monitor, minimize it
+                WinMinimize("ahk_id " hwnd)
+                OutputDebug("Minimized new window belonging to non-visible workspace")
+            }
+        }
+    }
+
+    ; Also queue a delayed assignment to catch any window movement or initialization issues
+    ; This helps ensure window properties and position are stable after initial creation
+    SetTimer(() => AssignNewWindow(hwnd), -1000) ; Run a follow-up check after 1 second
 }
 
-AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace
+AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed follow-up check)
     ; Check again if the window exists and is valid - it might have closed already
     if (!WinExist(hwnd) || !IsWindowValid(hwnd))
         return
-    
+
     title := WinGetTitle(hwnd)
     class := WinGetClass(hwnd)
-    OutputDebug("Assigning new window - Title: " title ", Class: " class ", hwnd: " hwnd)
-    
-    ; Assign the window to its monitor's workspace
-    monitorIndex := GetWindowMonitor(hwnd) ; Gets which monitor the window is on
-    OutputDebug("Window is on monitor: " monitorIndex)
-    
+    OutputDebug("Follow-up check for window - Title: " title ", Class: " class ", hwnd: " hwnd)
+
+    ; Check the window's current monitor (it may have moved since initial creation)
+    monitorIndex := GetWindowMonitor(hwnd) ; Gets which monitor the window is on now
+    OutputDebug("Window is now on monitor: " monitorIndex)
+
     if (MonitorWorkspaces.Has(monitorIndex)) { ; Checks if monitor has assigned workspace
         workspaceID := MonitorWorkspaces[monitorIndex] ; Gets workspace ID for this monitor
-        
-        ; Check if this window should be tracked
+
+        ; Check if this window already has a workspace assignment
         if (!WindowWorkspaces.Has(hwnd)) {
-            ; New window - assign to the current workspace of its monitor
+            ; Window was not assigned in initial handler - assign it now
             WindowWorkspaces[hwnd] := workspaceID ; Assigns window to workspace
             SaveWindowLayout(hwnd, workspaceID) ; Saves window layout
-            OutputDebug("Assigned new window to workspace " workspaceID " on monitor " monitorIndex)
-            
-            ; Determine if the window should be visible or hidden
+            OutputDebug("Window assigned in delayed check to workspace " workspaceID " on monitor " monitorIndex)
+
+            ; Check visibility
             currentWorkspaceID := MonitorWorkspaces[monitorIndex]
             if (workspaceID != currentWorkspaceID) {
-                ; If the window belongs to a workspace not currently shown on this monitor, minimize it
                 WinMinimize("ahk_id " hwnd)
-                OutputDebug("Minimized window belonging to non-visible workspace")
+                OutputDebug("Minimized window belonging to non-visible workspace (delayed check)")
             }
         } else {
-            ; Update existing window's workspace assignment if needed
-            if (WindowWorkspaces[hwnd] != workspaceID) {
+            ; Window already has workspace assignment, but may need updating if it moved monitors
+            currentWorkspaceID := WindowWorkspaces[hwnd]
+
+            ; If window's current workspace doesn't match its monitor's workspace, update it
+            if (currentWorkspaceID != workspaceID) {
                 WindowWorkspaces[hwnd] := workspaceID
                 SaveWindowLayout(hwnd, workspaceID)
-                OutputDebug("Updated existing window's workspace to " workspaceID)
+                OutputDebug("Updated window workspace from " currentWorkspaceID " to " workspaceID " (delayed check)")
+
+                ; Check if it needs to be minimized due to workspace mismatch
+                currentMonitorWorkspace := MonitorWorkspaces[monitorIndex]
+                if (workspaceID != currentMonitorWorkspace && WinGetMinMax(hwnd) != -1) {
+                    WinMinimize("ahk_id " hwnd)
+                    OutputDebug("Minimized moved window for workspace consistency (delayed check)")
+                }
             }
         }
     } else {
         ; Default to unassigned if monitor has no workspace
         WindowWorkspaces[hwnd] := 0
-        OutputDebug("Assigned new window to unassigned workspace (0) - monitor not tracked")
+        OutputDebug("Assigned window to unassigned workspace (0) - monitor not tracked (delayed check)")
     }
 }
 

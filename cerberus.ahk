@@ -8,12 +8,14 @@
 ; ----- Core System Functions -----
 
 InitializeWorkspaces() {
-    OutputDebug("============ INITIALIZING WORKSPACES ============")
-    
+    if (DEBUG_MODE)
+        OutputDebug("============ INITIALIZING WORKSPACES ============")
+
     ; Initialize monitor workspaces (default: monitor 1 = workspace 1, monitor 2 = workspace 2, etc.)
     monitorCount := MonitorGetCount() ; Gets the total number of physical monitors connected to the system
-    OutputDebug("Detected " monitorCount " monitors") ; Logs the number of detected monitors to debug output for troubleshooting
-    
+    if (DEBUG_MODE)
+        OutputDebug("Detected " monitorCount " monitors") ; Logs the number of detected monitors to debug output for troubleshooting
+
     loop MAX_MONITORS {
         monitorIndex := A_Index
         if (monitorIndex <= monitorCount) {
@@ -22,105 +24,133 @@ InitializeWorkspaces() {
             } else {
                 MonitorWorkspaces[monitorIndex] := 1  ; Default to workspace 1 if we have more monitors than workspaces
             }
-            OutputDebug("Assigned monitor " monitorIndex " to workspace " MonitorWorkspaces[monitorIndex])
+            if (DEBUG_MODE)
+                OutputDebug("Assigned monitor " monitorIndex " to workspace " MonitorWorkspaces[monitorIndex])
         }
     }
-    
+
     ; Capture all existing windows and assign them to their monitor's workspace
     DetectHiddenWindows(False) ; Turns off detection of hidden windows so only visible windows are captured
     windows := WinGetList() ; Retrieves an array of all visible window handles (HWND) currently open in the system
-    
-    OutputDebug("Found " windows.Length " total windows in system")
+
+    if (DEBUG_MODE)
+        OutputDebug("Found " windows.Length " total windows in system")
     windowCount := 0
     assignedCount := 0
-    
+
     ; First pass - identify all valid windows
     validWindows := []
     for hwnd in windows {
         windowCount++
         title := WinGetTitle(hwnd) ; Gets the title text from the window's title bar for identification
         class := WinGetClass(hwnd) ; Gets the window class name which identifies the window type or application
-        
-        OutputDebug("Checking window - Title: " title ", Class: " class ", hwnd: " hwnd)
-        
+
+        if (DEBUG_MODE)
+            OutputDebug("Checking window - Title: " title ", Class: " class ", hwnd: " hwnd)
+
         if (IsWindowValid(hwnd)) { ; Checks if this window should be tracked (excludes system windows, taskbar, etc.)
-            OutputDebug("Window is valid - adding to tracking list")
+            if (DEBUG_MODE)
+                OutputDebug("Window is valid - adding to tracking list")
             validWindows.Push(hwnd)
         }
     }
-    
-    OutputDebug("Found " validWindows.Length " valid windows to track")
-    
+
+    if (DEBUG_MODE)
+        OutputDebug("Found " validWindows.Length " valid windows to track")
+
     ; Second pass - assign valid windows to workspaces
     for hwnd in validWindows { ; Iterates through the array of window handles that passed validation
         title := WinGetTitle(hwnd)
         class := WinGetClass(hwnd)
-        
+
         ; Check if window is minimized - assign to workspace 0 if it is
         if (WinGetMinMax(hwnd) = -1) { ; Checks window state: -1=minimized, 0=normal, 1=maximized
             WindowWorkspaces[hwnd] := 0 ; Assigns minimized window to workspace 0 (unassigned)
-            OutputDebug("Window is minimized, assigned to workspace 0 (unassigned): " title)
+            if (DEBUG_MODE)
+                OutputDebug("Window is minimized, assigned to workspace 0 (unassigned): " title)
             continue ; Skip to next window
         }
-        
+
         ; Assign the window to its monitor's workspace
         monitorIndex := GetWindowMonitor(hwnd) ; Determines which physical monitor contains this window
         workspaceID := MonitorWorkspaces.Has(monitorIndex) ? MonitorWorkspaces[monitorIndex] : 0 ; Gets workspace ID for this monitor, or 0 if monitor isn't tracked
 
         WindowWorkspaces[hwnd] := workspaceID ; Adds window to the tracking map with its workspace ID
         SaveWindowLayout(hwnd, workspaceID) ; Stores window's position, size, and state (normal/maximized) for later restoration
-        
-        OutputDebug("Assigned window to workspace " workspaceID " on monitor " monitorIndex ": " title)
+
+        if (DEBUG_MODE)
+            OutputDebug("Assigned window to workspace " workspaceID " on monitor " monitorIndex ": " title)
         assignedCount++
     }
-    
-    OutputDebug("Initialization complete: Found " windowCount " windows, " validWindows.Length " valid, assigned " assignedCount " to workspaces")
-    OutputDebug("============ INITIALIZATION COMPLETE ============")
-    
+
+    if (DEBUG_MODE) {
+        OutputDebug("Initialization complete: Found " windowCount " windows, " validWindows.Length " valid, assigned " assignedCount " to workspaces")
+        OutputDebug("============ INITIALIZATION COMPLETE ============")
+    }
+
     ; Display a tray tip with the number of windows assigned
     TrayTip("Cerberus initialized", "Assigned " assignedCount " windows to workspaces") ; Shows notification in system tray
 }
 
 IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
-    if !WinExist(hwnd) ; Verifies if the window handle is still valid and references an existing window
+    ; Skip invalid handles safely
+    try {
+        if !WinExist(hwnd) ; Verifies if the window handle is still valid and references an existing window
+            return false
+    } catch Error as err {
+        ; If there's an error checking the window, it's definitely not valid
         return false
-    
-    ; Get window information
+    }
+
+    ; Get window information (only retrieve once)
     title := WinGetTitle(hwnd) ; Gets the window title
     class := WinGetClass(hwnd) ; Gets the window class
-    
-    ; Debug output for all windows to help diagnose what's happening
-    OutputDebug("Checking window - Title: " title ", Class: " class ", hwnd: " hwnd)
-    
-    ; Skip windows without a title
-    if (title = "")
+
+    ; Debug output for all windows only if DEBUG_MODE is on
+    if (DEBUG_MODE) {
+        OutputDebug("Checking window - Title: " title ", Class: " class ", hwnd: " hwnd)
+    }
+
+    ; Fast checks first (skip windows without a title or class)
+    if (title = "" || class = "")
         return false
-        
-    ; Skip windows without a class
-    if (class = "")
+
+    ; Skip the script's own window reliably using script's own hwnd
+    if (hwnd = A_ScriptHwnd)
         return false
-    
-    ; Only exclude the most basic system windows and let more through for testing
-    static skipClasses := "Progman,Shell_TrayWnd,WorkerW"
+
+    ; More comprehensive class filtering for system windows
+    static skipClasses := "Progman,Shell_TrayWnd,WorkerW,TaskListThumbnailWnd,ApplicationFrameWindow,Windows.UI.Core.CoreWindow,TaskManagerWindow,NotifyIconOverflowWindow"
     if (InStr(skipClasses, class))
         return false
-    
-    ; Skip the script's own window
-    if (WinActive("A") == hwnd)
+
+    ; More comprehensive title filtering for system components
+    static skipTitles := "Task View,Start Menu,Windows Shell Experience Host,Action Center,Search,Cortana,Windows Default Lock Screen,Notifications"
+    if (InStr(skipTitles, title))
         return false
-        
-    ; Very minimal title filtering for essential system components
-    if (InStr(title, "Task View") || InStr(title, "Start Menu"))
-        return false
-    
-    ; Skip child windows
+
+    ; Check window styles
     WS_CHILD := 0x40000000
-    style := WinGetStyle(hwnd) ; Retrieves window style flags that define window characteristics
+    WS_EX_TOOLWINDOW := 0x00000080
+    WS_EX_APPWINDOW := 0x00040000
+
+    style := WinGetStyle(hwnd) ; Retrieves window style flags
+    exStyle := WinGetExStyle(hwnd) ; Retrieves extended window style flags
+
+    ; Skip child windows
     if (style & WS_CHILD)
         return false
-    
-    ; Let most windows through for testing
-    OutputDebug("VALID WINDOW - Title: " title ", Class: " class ", hwnd: " hwnd)
+
+    ; Skip tool windows that don't appear in the taskbar (unless they have the APPWINDOW style)
+    if ((exStyle & WS_EX_TOOLWINDOW) && !(exStyle & WS_EX_APPWINDOW))
+        return false
+
+    ; For debugging, log valid windows
+    if (DEBUG_MODE) {
+        OutputDebug("VALID WINDOW - Title: " title ", Class: " class ", hwnd: " hwnd)
+    }
+
+    ; Window passed all checks, it's valid for tracking
     return true
 }
 
@@ -183,52 +213,121 @@ SaveWindowLayout(hwnd, workspaceID) { ; Stores window position and state for lat
 RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved position and state
     ; Check if window exists and is valid
     if !IsWindowValid(hwnd) {
-        OutputDebug("RESTORE FAILED: Window " hwnd " is not valid")
+        if (DEBUG_MODE)
+            OutputDebug("RESTORE FAILED: Window " hwnd " is not valid")
         return
     }
-    
+
     title := WinGetTitle(hwnd)
-    OutputDebug("Attempting to restore window: " title " (" hwnd ")")
-    
-    ; First ensure the window is restored from minimized state
-    winState := WinGetMinMax(hwnd) ; Gets window state (-1=minimized, 0=normal, 1=maximized)
-    if (winState = -1) { ; If window is currently minimized, restore it first before applying layout
-        OutputDebug("Window is minimized, restoring first")
-        WinRestore("ahk_id " hwnd) ; Restores window from minimized state so we can apply position/size
-        Sleep(100) ; Allow time for the window to restore
-    }
-    
-    ; Check if we have saved layout data
-    if (WorkspaceLayouts.Has(workspaceID)) {
-        layouts := WorkspaceLayouts[workspaceID]
-        
-        if (layouts.Has(hwnd)) {
-            layout := layouts[hwnd]
-            OutputDebug("Found saved layout for window: x=" layout.x ", y=" layout.y ", w=" layout.width ", h=" layout.height)
-            
-            ; Apply saved layout
-            if (layout.isMaximized) { ; If window was previously maximized
-                OutputDebug("Maximizing window")
-                WinMaximize("ahk_id " hwnd) ; Restore window to maximized state
-            } else {
-                ; Move window to saved position
-                try { ; Try to move window to saved position, might fail if window constraints prevent it
-                    OutputDebug("Moving window to saved position")
-                    WinMove(layout.x, layout.y, layout.width, layout.height, "ahk_id " hwnd) ; Moves and resizes window to saved position and dimensions
-                } catch Error as err {
-                    OutputDebug("ERROR moving window: " err.Message)
+    if (DEBUG_MODE)
+        OutputDebug("Attempting to restore window: " title " (" hwnd ")")
+
+    try {
+        ; First ensure the window is restored from minimized state
+        winState := WinGetMinMax(hwnd) ; Gets window state (-1=minimized, 0=normal, 1=maximized)
+        if (winState = -1) { ; If window is currently minimized, restore it first before applying layout
+            if (DEBUG_MODE)
+                OutputDebug("Window is minimized, restoring first")
+
+            try {
+                WinRestore("ahk_id " hwnd) ; Restores window from minimized state so we can apply position/size
+                Sleep(100) ; Allow time for the window to restore
+
+                ; Verify the restore worked
+                if (WinGetMinMax(hwnd) = -1) {
+                    if (DEBUG_MODE)
+                        OutputDebug("Window restore failed, retrying...")
+                    Sleep(200)
+                    WinRestore("ahk_id " hwnd) ; Try again
+                    Sleep(100)
                 }
+            } catch Error as err {
+                if (DEBUG_MODE)
+                    OutputDebug("ERROR restoring window from minimized state: " err.Message)
+            }
+        }
+
+        ; Check if we have saved layout data
+        if (WorkspaceLayouts.Has(workspaceID)) {
+            layouts := WorkspaceLayouts[workspaceID]
+
+            if (layouts.Has(hwnd)) {
+                layout := layouts[hwnd]
+                if (DEBUG_MODE)
+                    OutputDebug("Found saved layout for window: x=" layout.x ", y=" layout.y ", w=" layout.width ", h=" layout.height)
+
+                ; Apply saved layout
+                if (layout.isMaximized) { ; If window was previously maximized
+                    if (DEBUG_MODE)
+                        OutputDebug("Maximizing window")
+
+                    try {
+                        WinMaximize("ahk_id " hwnd) ; Restore window to maximized state
+
+                        ; Verify maximize worked
+                        if (WinGetMinMax(hwnd) != 1) {
+                            if (DEBUG_MODE)
+                                OutputDebug("Window maximize failed, retrying...")
+                            Sleep(200)
+                            WinMaximize("ahk_id " hwnd) ; Try again
+                        }
+                    } catch Error as err {
+                        if (DEBUG_MODE)
+                            OutputDebug("ERROR maximizing window: " err.Message)
+                    }
+                } else {
+                    ; Move window to saved position
+                    try {
+                        if (DEBUG_MODE)
+                            OutputDebug("Moving window to saved position")
+
+                        ; Ensure coordinates are within screen bounds
+                        monitorCount := MonitorGetCount()
+                        coordsValid := false
+
+                        ; Check if coordinates are within any monitor's bounds
+                        loop monitorCount {
+                            MonitorGetWorkArea(A_Index, &mLeft, &mTop, &mRight, &mBottom)
+                            if (layout.x >= mLeft - layout.width && layout.x <= mRight &&
+                                layout.y >= mTop - layout.height && layout.y <= mBottom) {
+                                coordsValid := true
+                                break
+                            }
+                        }
+
+                        if (coordsValid) {
+                            WinMove(layout.x, layout.y, layout.width, layout.height, "ahk_id " hwnd)
+                        } else {
+                            if (DEBUG_MODE)
+                                OutputDebug("Window position out of bounds, using default position")
+                            WinActivate("ahk_id " hwnd)
+                        }
+                    } catch Error as err {
+                        if (DEBUG_MODE)
+                            OutputDebug("ERROR moving window: " err.Message)
+                    }
+                }
+            } else {
+                if (DEBUG_MODE)
+                    OutputDebug("No saved layout found for this window, using default position")
+                WinActivate("ahk_id " hwnd) ; At least activate the window
             }
         } else {
-            OutputDebug("No saved layout found for this window, using default position")
-            WinActivate("ahk_id " hwnd) ; At least activate the window
+            if (DEBUG_MODE)
+                OutputDebug("No layouts saved for workspace " workspaceID)
         }
-    } else {
-        OutputDebug("No layouts saved for workspace " workspaceID)
+
+        ; Ensure window is visible and brought to front
+        try {
+            WinActivate("ahk_id " hwnd) ; Brings window to foreground and gives it keyboard focus
+        } catch Error as err {
+            if (DEBUG_MODE)
+                OutputDebug("ERROR activating window: " err.Message)
+        }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            OutputDebug("CRITICAL ERROR in RestoreWindowLayout: " err.Message)
     }
-    
-    ; Ensure window is visible and brought to front
-    WinActivate("ahk_id " hwnd) ; Brings window to foreground and gives it keyboard focus
 }
 
 SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
@@ -437,25 +536,82 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
 
 ; ----- Event Handlers -----
 
+; Clean up stale window references to prevent memory leaks
+CleanupWindowReferences() {
+    ; Clean up lastWindowState map
+    staleCount := 0
+    for hwnd, state in WindowMoveResizeHandler.lastWindowState {
+        try {
+            if !WinExist(hwnd) {
+                WindowMoveResizeHandler.lastWindowState.Delete(hwnd)
+                staleCount++
+            }
+        } catch Error as err {
+            ; If there's an error, remove this reference anyway
+            WindowMoveResizeHandler.lastWindowState.Delete(hwnd)
+            staleCount++
+        }
+    }
+
+    ; Clean up WindowWorkspaces map
+    workspaceStaleCount := 0
+    for hwnd, workspaceID in WindowWorkspaces {
+        try {
+            if !WinExist(hwnd) {
+                WindowWorkspaces.Delete(hwnd)
+                workspaceStaleCount++
+            }
+        } catch Error as err {
+            ; If there's an error, remove this reference anyway
+            WindowWorkspaces.Delete(hwnd)
+            workspaceStaleCount++
+        }
+    }
+
+    ; Clean up WorkspaceLayouts map
+    for workspaceID, layoutMap in WorkspaceLayouts {
+        layoutStaleCount := 0
+        for hwnd, layout in layoutMap {
+            try {
+                if !WinExist(hwnd) {
+                    layoutMap.Delete(hwnd)
+                    layoutStaleCount++
+                }
+            } catch Error as err {
+                ; If there's an error, remove this reference anyway
+                layoutMap.Delete(hwnd)
+                layoutStaleCount++
+            }
+        }
+        if (layoutStaleCount > 0) {
+            OutputDebug("Cleaned up " layoutStaleCount " stale layout entries for workspace " workspaceID)
+        }
+    }
+
+    if (staleCount > 0 || workspaceStaleCount > 0) {
+        OutputDebug("Cleaned up " staleCount " stale window state entries and " workspaceStaleCount " stale workspace entries")
+    }
+}
+
 WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resize events to update saved layouts
     ; Skip invalid windows
     if (!IsWindowValid(hwnd))
         return
-        
+
     ; Get window state
     winState := WinGetMinMax(hwnd)
     title := WinGetTitle(hwnd)
-    
+
     ; Check if window is minimized
     if (winState = -1) { ; Window is minimized
         ; Check if window is assigned to a workspace
         if (WindowWorkspaces.Has(hwnd)) {
             workspaceID := WindowWorkspaces[hwnd]
-            
+
             ; Get the active monitor and its workspace
             activeMonitor := GetActiveMonitor()
             activeWorkspaceID := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 1
-            
+
             ; If window belongs to the currently active workspace, set it to workspace 0 (unassigned)
             if (workspaceID = activeWorkspaceID) {
                 WindowWorkspaces[hwnd] := 0
@@ -464,47 +620,51 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
         }
         return
     }
-    
+
     ; Handle window un-minimization (going from minimized to normal state)
+    ; Use a static class variable to persist the map between function calls
     static lastWindowState := Map() ; Static map to track previous window states
-    
+
+    ; Store the map in the function object to make it accessible from other functions
+    WindowMoveResizeHandler.lastWindowState := lastWindowState
+
     ; Check if we're tracking this window already
     if (!lastWindowState.Has(hwnd))
         lastWindowState[hwnd] := -999 ; Initialize with invalid state value
-        
+
     ; Detect un-minimization (from minimized to normal/maximized)
     if (lastWindowState[hwnd] = -1 && winState != -1) {
         ; Window was just un-minimized, assign to monitor's workspace
         windowMonitor := GetWindowMonitor(hwnd)
-        
+
         if (MonitorWorkspaces.Has(windowMonitor)) {
             newWorkspaceID := MonitorWorkspaces[windowMonitor]
-            
+
             ; Update workspace assignment
             prevWorkspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
-            
+
             if (prevWorkspaceID != newWorkspaceID) {
                 WindowWorkspaces[hwnd] := newWorkspaceID
                 OutputDebug("Window un-minimized, reassigned from workspace " prevWorkspaceID " to " newWorkspaceID ": " title)
             }
         }
     }
-    
+
     ; Update last known state
     lastWindowState[hwnd] := winState
-    
+
     ; For moved/resized windows, update workspace assignment based on monitor
     if (msg = 0x0003 || msg = 0x0005) { ; WM_MOVE or WM_SIZE
         ; Get current monitor and workspace assignment
         windowMonitor := GetWindowMonitor(hwnd)
-        
+
         if (MonitorWorkspaces.Has(windowMonitor)) {
             currentMonitorWorkspace := MonitorWorkspaces[windowMonitor]
-            
+
             ; Only update if window has a workspace assigned
             if (WindowWorkspaces.Has(hwnd)) {
                 currentWindowWorkspace := WindowWorkspaces[hwnd]
-                
+
                 ; If window's workspace doesn't match its monitor's workspace, update it
                 if (currentWindowWorkspace != currentMonitorWorkspace && currentWindowWorkspace != 0) {
                     WindowWorkspaces[hwnd] := currentMonitorWorkspace
@@ -513,7 +673,7 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
             }
         }
     }
-    
+
     ; Save layout if window has a valid workspace assignment
     if (WindowWorkspaces.Has(hwnd)) {
         workspaceID := WindowWorkspaces[hwnd]
@@ -743,6 +903,9 @@ MAX_WORKSPACES := 9  ; Maximum number of workspaces (1-9)
 MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
 
 ; ====== Global Variables ======
+; Debug flag (set to True for verbose debug output)
+global DEBUG_MODE := False
+
 ; Monitor workspace assignments (monitor index → workspace ID)
 global MonitorWorkspaces := Map()
 ; Window workspace assignments (window ID → workspace ID)
@@ -772,6 +935,9 @@ DetectHiddenWindows(False) ; Disables detection of hidden windows so they won't 
 ; ====== Start Cerberus ======
 InitializeWorkspaces() ; Call to initialize workspaces when script starts - sets up monitor-workspace mapping and assigns windows
 InitializeOverlays() ; Create workspace overlay displays - adds visual indicators for workspace numbers
+
+; Set up periodic cleanup of window references (every 2 minutes)
+SetTimer(CleanupWindowReferences, 120000)
 
 ; ====== Keyboard Shortcuts ======
 ; Ctrl+1 through Ctrl+9 for switching workspaces

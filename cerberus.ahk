@@ -571,10 +571,18 @@ OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE - Registers a handler for 
 OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE - Registers a handler for window resize events
 
 WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resize events to update saved layouts
+    ; Skip invalid windows
+    if (!IsWindowValid(hwnd))
+        return
+
+    ; Get window state
+    winState := WinGetMinMax(hwnd)
+    title := WinGetTitle(hwnd)
+
     ; Check if window is minimized
-    if (WinGetMinMax(hwnd) = -1) { ; Window is minimized
-        ; Check if window is valid and currently assigned to a workspace
-        if (IsWindowValid(hwnd) && WindowWorkspaces.Has(hwnd)) {
+    if (winState = -1) { ; Window is minimized
+        ; Check if window is assigned to a workspace
+        if (WindowWorkspaces.Has(hwnd)) {
             workspaceID := WindowWorkspaces[hwnd]
 
             ; Get the active monitor and its workspace
@@ -584,16 +592,66 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
             ; If window belongs to the currently active workspace, set it to workspace 0 (unassigned)
             if (workspaceID = activeWorkspaceID) {
                 WindowWorkspaces[hwnd] := 0
-                OutputDebug("Window minimized and removed from active workspace: " WinGetTitle(hwnd))
+                OutputDebug("Window minimized and removed from active workspace: " title)
             }
         }
         return
     }
 
-    if (IsWindowValid(hwnd) && WindowWorkspaces.Has(hwnd)) { ; Checks if window is valid and has workspace assignment
-        workspaceID := WindowWorkspaces[hwnd] ; Gets workspace ID for this window
+    ; Handle window un-minimization (going from minimized to normal state)
+    static lastWindowState := Map() ; Static map to track previous window states
+
+    ; Check if we're tracking this window already
+    if (!lastWindowState.Has(hwnd))
+        lastWindowState[hwnd] := -999 ; Initialize with invalid state value
+
+    ; Detect un-minimization (from minimized to normal/maximized)
+    if (lastWindowState[hwnd] = -1 && winState != -1) {
+        ; Window was just un-minimized, assign to monitor's workspace
+        windowMonitor := GetWindowMonitor(hwnd)
+
+        if (MonitorWorkspaces.Has(windowMonitor)) {
+            newWorkspaceID := MonitorWorkspaces[windowMonitor]
+
+            ; Update workspace assignment
+            prevWorkspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
+
+            if (prevWorkspaceID != newWorkspaceID) {
+                WindowWorkspaces[hwnd] := newWorkspaceID
+                OutputDebug("Window un-minimized, reassigned from workspace " prevWorkspaceID " to " newWorkspaceID ": " title)
+            }
+        }
+    }
+
+    ; Update last known state
+    lastWindowState[hwnd] := winState
+
+    ; For moved/resized windows, update workspace assignment based on monitor
+    if (msg = 0x0003 || msg = 0x0005) { ; WM_MOVE or WM_SIZE
+        ; Get current monitor and workspace assignment
+        windowMonitor := GetWindowMonitor(hwnd)
+
+        if (MonitorWorkspaces.Has(windowMonitor)) {
+            currentMonitorWorkspace := MonitorWorkspaces[windowMonitor]
+
+            ; Only update if window has a workspace assigned
+            if (WindowWorkspaces.Has(hwnd)) {
+                currentWindowWorkspace := WindowWorkspaces[hwnd]
+
+                ; If window's workspace doesn't match its monitor's workspace, update it
+                if (currentWindowWorkspace != currentMonitorWorkspace && currentWindowWorkspace != 0) {
+                    WindowWorkspaces[hwnd] := currentMonitorWorkspace
+                    OutputDebug("Window moved/resized, reassigned from workspace " currentWindowWorkspace " to " currentMonitorWorkspace ": " title)
+                }
+            }
+        }
+    }
+
+    ; Save layout if window has a valid workspace assignment
+    if (WindowWorkspaces.Has(hwnd)) {
+        workspaceID := WindowWorkspaces[hwnd]
         if (workspaceID > 0)
-            SaveWindowLayout(hwnd, workspaceID) ; Saves updated window layout
+            SaveWindowLayout(hwnd, workspaceID)
     }
 }
 

@@ -1,0 +1,12 @@
+2025-05-09 12:12:34 - Command client main entry point, PID: 1539469, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:34 - Arguments: ['/home/user/metaclaude/metaclaude/core/command_client.py', 'claude_process_b2dc948e', 'restart']
+2025-05-09 12:12:34 - Current directory: /home/user/cerberus_ahk
+2025-05-09 12:12:34 - User home: /home/user
+2025-05-09 12:12:34 - Setting up direct logger, PID: 1539469, CWD: /home/user/cerberus_ahk, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:34 - Environment variables: {'HOME': '/home/user', 'USER': 'user', 'TMPDIR': 'Not set', 'XDG_RUNTIME_DIR': '/run/user/1000/', 'STY': '1539213.claude_process_b2dc948e', 'TMUX': 'Not set'}
+2025-05-09 12:12:35 - Trying to set up log files at: ['/home/user/cerberus_ahk/command_client.log', '/home/user/command_client.log', '/tmp/command_client.log', '/dev/shm/command_client.log']
+2025-05-09 12:12:35 - Successfully set up log file: /home/user/cerberus_ahk/command_client.log
+2025-05-09 12:12:35 - Successfully set up log file: /home/user/command_client.log
+2025-05-09 12:12:35 - Successfully set up log file: /tmp/command_client.log
+2025-05-09 12:12:35 - Successfully set up log file: /dev/shm/command_client.log
+2025-05-09 12:12:35 - Logger setup completed successfully

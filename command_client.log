@@ -1,0 +1,33 @@
+=== Command client direct log started at 2025-05-09 12:12:35 ===
+2025-05-09 12:12:35,079 - command_client_debug - DEBUG - Command client starting, PID: 1539469
+2025-05-09 12:12:35,080 - command_client_debug - DEBUG - Arguments: screen_full_name='claude_process_b2dc948e', cmd='restart'
+2025-05-09 12:12:35,080 - command_client_debug - DEBUG - Environment: CWD=/home/user/cerberus_ahk
+2025-05-09 12:12:35,081 - command_client_debug - DEBUG - Environment variables: STY=1539213.claude_process_b2dc948e, TMUX=Not set
+2025-05-09 12:12:35,081 - command_client_debug - DEBUG - Potential metadata locations: [PosixPath('/home/user/.metaclaude.server.json'), '/tmp/metaclaude/.metaclaude.server.json', '/run/user/1000/metaclaude/.metaclaude.server.json', '/var/tmp/metaclaude/.metaclaude.server.json']
+2025-05-09 12:12:35,081 - command_client_debug - DEBUG - Checking metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35,081 - command_client_debug - DEBUG - Metadata file exists: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35,081 - command_client_debug - DEBUG - Content of /home/user/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35,082 - command_client_debug - DEBUG - Checking metadata file: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35,082 - command_client_debug - DEBUG - Metadata file exists: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35,082 - command_client_debug - DEBUG - Content of /tmp/metaclaude/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35,082 - command_client_debug - DEBUG - Checking metadata file: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35,082 - command_client_debug - DEBUG - Metadata file exists: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35,082 - command_client_debug - DEBUG - Content of /run/user/1000/metaclaude/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35,083 - command_client_debug - DEBUG - Checking metadata file: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35,083 - command_client_debug - DEBUG - Metadata file exists: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35,083 - command_client_debug - DEBUG - Content of /var/tmp/metaclaude/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35,083 - command_client_debug - DEBUG - Temp directory: /tmp, Metaclaude dir: /tmp/metaclaude
+2025-05-09 12:12:35,083 - command_client_debug - DEBUG - Checking socket directory: /tmp/metaclaude
+2025-05-09 12:12:35,084 - command_client_debug - DEBUG - Directory /tmp/metaclaude exists, contents: ['.metaclaude.server.json', 'metaclaude.sock']
+2025-05-09 12:12:35,084 - command_client_debug - DEBUG - Found socket files: ['metaclaude.sock']
+2025-05-09 12:12:35,084 - command_client_debug - DEBUG - Checking socket directory: /run/user/1000/metaclaude
+2025-05-09 12:12:35,084 - command_client_debug - DEBUG - Directory /run/user/1000/metaclaude exists, contents: ['.metaclaude.server.json']
+2025-05-09 12:12:35,084 - command_client_debug - DEBUG - Checking socket directory: /tmp/metaclaude
+2025-05-09 12:12:35,084 - command_client_debug - DEBUG - Directory /tmp/metaclaude exists, contents: ['.metaclaude.server.json', 'metaclaude.sock']
+2025-05-09 12:12:35,085 - command_client_debug - DEBUG - Found socket files: ['metaclaude.sock']
+2025-05-09 12:12:35,085 - command_client_debug - DEBUG - Checking socket directory: /var/tmp/metaclaude
+2025-05-09 12:12:35,085 - command_client_debug - DEBUG - Directory /var/tmp/metaclaude exists, contents: ['.metaclaude.server.json']
+2025-05-09 12:12:35,085 - command_client_debug - DEBUG - Extracted session name: claude_process_b2dc948e
+2025-05-09 12:12:35,085 - command_client_debug - DEBUG - Sending command: restart for session: claude_process_b2dc948e
+2025-05-09 12:12:35,091 - command_client_debug - DEBUG - Command result: True
+2025-05-09 12:12:35,091 - command_client_debug - DEBUG - Command succeeded

@@ -1,0 +1,10 @@
+Fri May  9 12:12:30 2025: Starting main monitor thread
+Fri May  9 12:12:30 2025: Monitor thread started
+Fri May  9 12:12:30 2025: Requesting switch to crash monitoring mode
+Fri May  9 12:12:30 2025: Switching to mode MonitorMode.CRASH_MONITORING
+Fri May  9 12:12:35 2025: Requesting to stop monitoring
+Fri May  9 12:12:35 2025: Received STOP command
+Fri May  9 12:12:35 2025: Requesting to terminate monitor thread
+Fri May  9 12:12:35 2025: Terminating monitor thread
+Fri May  9 12:12:35 2025: Monitor thread exiting
+Fri May  9 12:12:35 2025: Requesting to stop monitoring

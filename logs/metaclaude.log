@@ -1,0 +1,502 @@
+2025-05-09 12:12:25 - metaclaude - INFO - Console logging disabled (default)
+2025-05-09 12:12:25 - metaclaude - INFO - Starting socket discovery, process PID: 1539167, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:25 - metaclaude - INFO - Current working directory: /home/user/cerberus_ahk
+2025-05-09 12:12:25 - metaclaude - INFO - Home directory expansion: /home/user
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /home/user/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file size: 142 bytes, modified: 1746138543.1891274
+2025-05-09 12:12:25 - metaclaude - DEBUG - Reading metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 537374, "timestamp": 1746138543.2052457, "start_time": "2025-05-01 15:29:03"}
+2025-05-09 12:12:25 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - DEBUG - Socket file not found at registered path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file not found: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file not found: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file size: 142 bytes, modified: 1746138543.1992683
+2025-05-09 12:12:25 - metaclaude - DEBUG - Reading metadata file: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 537374, "timestamp": 1746138543.2052457, "start_time": "2025-05-01 15:29:03"}
+2025-05-09 12:12:25 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - DEBUG - Socket file not found at registered path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - WARNING - No valid socket found through metadata files, searching directly
+2025-05-09 12:12:25 - metaclaude - INFO - Searching for active socket in potential directories
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /tmp/metaclaude
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /run/user/1000/metaclaude
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /tmp/metaclaude
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /var/tmp/metaclaude
+2025-05-09 12:12:25 - metaclaude - WARNING - No active socket found in any potential location
+2025-05-09 12:12:25 - metaclaude - INFO - None
+2025-05-09 12:12:25 - metaclaude - DEBUG - Default socket path not found: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - INFO - Server not running, starting...
+2025-05-09 12:12:25 - metaclaude - INFO - Starting Server process...
+2025-05-09 12:12:25 - metaclaude - INFO - Starting socket discovery, process PID: 1539167, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:25 - metaclaude - INFO - Current working directory: /home/user/cerberus_ahk
+2025-05-09 12:12:25 - metaclaude - INFO - Home directory expansion: /home/user
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /home/user/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file size: 142 bytes, modified: 1746138543.1891274
+2025-05-09 12:12:25 - metaclaude - DEBUG - Reading metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 537374, "timestamp": 1746138543.2052457, "start_time": "2025-05-01 15:29:03"}
+2025-05-09 12:12:25 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - DEBUG - Socket file not found at registered path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file not found: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file not found: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file size: 142 bytes, modified: 1746138543.1992683
+2025-05-09 12:12:25 - metaclaude - DEBUG - Reading metadata file: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 537374, "timestamp": 1746138543.2052457, "start_time": "2025-05-01 15:29:03"}
+2025-05-09 12:12:25 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - DEBUG - Socket file not found at registered path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - WARNING - No valid socket found through metadata files, searching directly
+2025-05-09 12:12:25 - metaclaude - INFO - Searching for active socket in potential directories
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /tmp/metaclaude
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /run/user/1000/metaclaude
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /tmp/metaclaude
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /var/tmp/metaclaude
+2025-05-09 12:12:25 - metaclaude - WARNING - No active socket found in any potential location
+2025-05-09 12:12:25 - metaclaude - INFO - Started server process (PID: 1539171)
+2025-05-09 12:12:25 - metaclaude - INFO - Server logs will be written to /home/user/cerberus_ahk/logs/server.log
+2025-05-09 12:12:25 - metaclaude - INFO - Starting socket discovery, process PID: 1539167, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:25 - metaclaude - INFO - Current working directory: /home/user/cerberus_ahk
+2025-05-09 12:12:25 - metaclaude - INFO - Home directory expansion: /home/user
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /home/user/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file size: 142 bytes, modified: 1746138543.1891274
+2025-05-09 12:12:25 - metaclaude - DEBUG - Reading metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 537374, "timestamp": 1746138543.2052457, "start_time": "2025-05-01 15:29:03"}
+2025-05-09 12:12:25 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - DEBUG - Socket file not found at registered path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file not found: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file not found: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - INFO - Looking for metadata file at: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file size: 142 bytes, modified: 1746138543.1992683
+2025-05-09 12:12:25 - metaclaude - DEBUG - Reading metadata file: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 537374, "timestamp": 1746138543.2052457, "start_time": "2025-05-01 15:29:03"}
+2025-05-09 12:12:25 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - DEBUG - Socket file not found at registered path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - WARNING - No valid socket found through metadata files, searching directly
+2025-05-09 12:12:25 - metaclaude - INFO - Searching for active socket in potential directories
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /tmp/metaclaude
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /run/user/1000/metaclaude
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /tmp/metaclaude
+2025-05-09 12:12:25 - metaclaude - INFO - Checking directory for sockets: /var/tmp/metaclaude
+2025-05-09 12:12:25 - metaclaude - WARNING - No active socket found in any potential location
+2025-05-09 12:12:25 - metaclaude - INFO - None
+2025-05-09 12:12:25 - metaclaude - DEBUG - Default socket path not found: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - INFO - Waiting for server to start (attempt 1/10)...
+2025-05-09 12:12:25 - metaclaude - INFO - Socket class initialized from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:25 - metaclaude - INFO - Socket module path: /home/user/metaclaude/metaclaude/net/socket.py
+2025-05-09 12:12:25 - metaclaude - DEBUG - Wrote metadata to /home/user/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Wrote metadata to /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Wrote metadata to /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Wrote metadata to /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - DEBUG - Wrote metadata to /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:25 - metaclaude - INFO - Registered socket path in primary and alternative locations: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude - INFO - ServerSocket started on /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:25 - metaclaude_server - INFO - Server started
+2025-05-09 12:12:26 - metaclaude - INFO - Starting socket discovery, process PID: 1539167, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:26 - metaclaude - INFO - Current working directory: /home/user/cerberus_ahk
+2025-05-09 12:12:26 - metaclaude - INFO - Home directory expansion: /home/user
+2025-05-09 12:12:26 - metaclaude - INFO - Looking for metadata file at: /home/user/.metaclaude.server.json
+2025-05-09 12:12:26 - metaclaude - DEBUG - Metadata file size: 143 bytes, modified: 1746817945.4053254
+2025-05-09 12:12:26 - metaclaude - DEBUG - Reading metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:26 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:26 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:26 - metaclaude - DEBUG - Checking if server process is running, PID: 1539171
+2025-05-09 12:12:26 - metaclaude - DEBUG - Server process with PID 1539171 is running
+2025-05-09 12:12:26 - metaclaude - INFO - Successfully discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:26 - metaclaude - INFO - /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:26 - metaclaude - INFO - Socket class initialized from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:26 - metaclaude - INFO - Socket module path: /home/user/metaclaude/metaclaude/net/socket.py
+2025-05-09 12:12:26 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:26 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:26 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:26 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:26 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:26 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:26 - metaclaude - INFO - Server is now running
+2025-05-09 12:12:26 - metaclaude - INFO - Socket class initialized from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:26 - metaclaude - INFO - Socket module path: /home/user/metaclaude/metaclaude/net/socket.py
+2025-05-09 12:12:26 - metaclaude - INFO - Starting socket discovery, process PID: 1539167, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:26 - metaclaude - INFO - Current working directory: /home/user/cerberus_ahk
+2025-05-09 12:12:26 - metaclaude - INFO - Home directory expansion: /home/user
+2025-05-09 12:12:26 - metaclaude - INFO - Looking for metadata file at: /home/user/.metaclaude.server.json
+2025-05-09 12:12:26 - metaclaude - DEBUG - Metadata file size: 143 bytes, modified: 1746817945.4053254
+2025-05-09 12:12:26 - metaclaude - DEBUG - Reading metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:26 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:26 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:26 - metaclaude - DEBUG - Checking if server process is running, PID: 1539171
+2025-05-09 12:12:26 - metaclaude - DEBUG - Server process with PID 1539171 is running
+2025-05-09 12:12:26 - metaclaude - INFO - Successfully discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:26 - metaclaude - DEBUG - Using discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:26 - metaclaude - INFO - Creating a new session with plugins: ocf...
+2025-05-09 12:12:26 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:26 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:26 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:26 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:26 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:26 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:26 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:26 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:26 - metaclaude - INFO - Received command: create_session
+2025-05-09 12:12:26 - metaclaude - DEBUG - Generated unique tmux session name: metaclaude_a50e0e34
+2025-05-09 12:12:26 - metaclaude - DEBUG - Generated unique screen session name: claude_process_b2dc948e
+2025-05-09 12:12:26 - metaclaude_server - INFO - Creating new session with UID: 0, plugins: ocf, client_cwd: /home/user/cerberus_ahk, client_tty: /dev/pts/9
+2025-05-09 12:12:26 - metaclaude_server - INFO - Using client-specific log directory: /home/user/cerberus_ahk/logs
+2025-05-09 12:12:26 - metaclaude_server - INFO - Using client-specific monitor directory: /home/user/cerberus_ahk/logs/monitor
+2025-05-09 12:12:27 - metaclaude_server - INFO - Session 0 using client working directory: /home/user/cerberus_ahk
+2025-05-09 12:12:27 - metaclaude_server - DEBUG - Plugin list: ['ocf']
+2025-05-09 12:12:27 - metaclaude_server - INFO - Considering plugin: ocf
+2025-05-09 12:12:27 - metaclaude - INFO - Registered plugin 'ocf'
+2025-05-09 12:12:27 - metaclaude - INFO - Loaded module ocf_plugin, classes: ['LanguageInterface', 'OcfPlugin']
+2025-05-09 12:12:27 - metaclaude - INFO - Registered plugin 'vanilla-language'
+2025-05-09 12:12:27 - metaclaude - INFO - Loaded module vanilla_language_plugin, classes: ['LanguageInterface', 'VanillaLanguagePlugin']
+2025-05-09 12:12:27 - metaclaude - INFO - Registered plugin 'vanilla-frontend'
+2025-05-09 12:12:27 - metaclaude - INFO - Loaded module vanilla_frontend_plugin, classes: ['FrontendInterface', 'Path', 'VanillaFrontendPlugin']
+2025-05-09 12:12:27 - metaclaude - INFO - Registered plugin 'enhancer'
+2025-05-09 12:12:27 - metaclaude - INFO - Loaded module enhancer_plugin, classes: ['EnhancerPlugin', 'Path', 'TemplatesPlugin']
+2025-05-09 12:12:27 - metaclaude - INFO - Registered plugin 'default'
+2025-05-09 12:12:27 - metaclaude - INFO - Loaded module default_plugin, classes: ['DefaultAudioPlugin', 'DefaultFrontendPlugin', 'DefaultLanguagePlugin', 'DefaultMonitorPlugin', 'DefaultPlugin']
+2025-05-09 12:12:27 - metaclaude - INFO - Registered plugin 'vanilla-monitor'
+2025-05-09 12:12:27 - metaclaude - INFO - Loaded module vanilla_monitor_plugin, classes: ['MonitorInterface', 'VanillaMonitorPlugin']
+2025-05-09 12:12:27 - metaclaude - INFO - Registered plugin 'featurizer'
+2025-05-09 12:12:27 - metaclaude - INFO - Loaded module featurizer_plugin, classes: ['EnhancerPlugin', 'FeaturizerPlugin']
+2025-05-09 12:12:27 - metaclaude - INFO - Registered plugin 'templates'
+2025-05-09 12:12:27 - metaclaude - INFO - Loaded module templates_plugin, classes: ['TemplatesPlugin', 'VanillaLanguagePlugin']
+2025-05-09 12:12:27 - metaclaude - INFO - Registered plugin 'vanilla-audio'
+2025-05-09 12:12:27 - metaclaude - INFO - Loaded module vanilla_audio_plugin, classes: ['AudioInterface', 'Path', 'VanillaAudioPlugin']
+2025-05-09 12:12:27 - metaclaude - INFO - Discovered plugins: ['ocf', 'vanilla-language', 'vanilla-frontend', 'enhancer', 'default', 'vanilla-monitor', 'featurizer', 'templates', 'vanilla-audio']
+2025-05-09 12:12:27 - metaclaude_server - INFO - Plugin 'ocf' class from registry: <class 'metaclaude.plugins.ocf_plugin.OcfPlugin'>
+2025-05-09 12:12:27 - metaclaude_server - INFO - Attempting to create instance of plugin ocf: OcfPlugin
+2025-05-09 12:12:27 - metaclaude_server - INFO - Created instance of plugin: OcfPlugin
+2025-05-09 12:12:27 - metaclaude_server - INFO - Loaded plugin: OcfPlugin for LanguageInterface
+2025-05-09 12:12:27 - metaclaude_server - INFO - Considering plugin: default
+2025-05-09 12:12:27 - metaclaude_server - INFO - Plugin 'default' class from registry: <class 'metaclaude.plugins.default_plugin.DefaultPlugin'>
+2025-05-09 12:12:27 - metaclaude_server - INFO - Attempting to create instance of plugin default: DefaultPlugin
+2025-05-09 12:12:27 - metaclaude_server - INFO - Created instance of plugin: DefaultPlugin
+2025-05-09 12:12:27 - metaclaude_server - INFO - Loaded plugin: DefaultPlugin for AudioInterface
+2025-05-09 12:12:27 - metaclaude_server - INFO - Loaded plugin: DefaultPlugin for FrontendInterface
+2025-05-09 12:12:27 - metaclaude_server - INFO - Loaded plugin: DefaultPlugin for MonitorInterface
+2025-05-09 12:12:27 - metaclaude_server - INFO - Created session with ID 0, tmux=metaclaude_a50e0e34, claude=claude_process_b2dc948e, plugins=ocf
+2025-05-09 12:12:27 - metaclaude - INFO - Created new session with ID: 0 using plugins: ocf
+2025-05-09 12:12:27 - metaclaude - INFO - Starting session 0...
+2025-05-09 12:12:27 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:27 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:27 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:27 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:27 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:27 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:27 - metaclaude - INFO - Received command: run_session
+2025-05-09 12:12:27 - metaclaude - INFO - Session 0 started successfully
+2025-05-09 12:12:27 - metaclaude - INFO - Starting command polling thread...
+2025-05-09 12:12:27 - metaclaude - INFO - Starting session 0 in separate thread
+2025-05-09 12:12:27 - metaclaude - INFO - Command polling thread started for session 0
+2025-05-09 12:12:27 - metaclaude - INFO - Session is running in the background. Press Ctrl+C to terminate.
+2025-05-09 12:12:27 - metaclaude - INFO - Socket class initialized from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:27 - metaclaude - INFO - Socket module path: /home/user/metaclaude/metaclaude/net/socket.py
+2025-05-09 12:12:27 - metaclaude - INFO - Starting socket discovery, process PID: 1539167, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:27 - metaclaude_server - INFO - Created new commands.txt file at /home/user/cerberus_ahk/commands.txt
+2025-05-09 12:12:27 - metaclaude - INFO - Current working directory: /home/user/cerberus_ahk
+2025-05-09 12:12:27 - metaclaude_server - INFO - Using commands.txt at absolute path: /home/user/cerberus_ahk/commands.txt
+2025-05-09 12:12:27 - metaclaude - INFO - Home directory expansion: /home/user
+2025-05-09 12:12:27 - metaclaude - INFO - Looking for metadata file at: /home/user/.metaclaude.server.json
+2025-05-09 12:12:27 - metaclaude_server - INFO - Created new file at /home/user/cerberus_ahk/CLAUDE.md.
+2025-05-09 12:12:27 - metaclaude - DEBUG - Metadata file size: 143 bytes, modified: 1746817945.4053254
+2025-05-09 12:12:27 - metaclaude_server - INFO - Using absolute path: /home/user/cerberus_ahk/CLAUDE.md
+2025-05-09 12:12:27 - metaclaude - DEBUG - Reading metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:27 - metaclaude_server - INFO - Created new file at /home/user/cerberus_ahk/screenrc.
+2025-05-09 12:12:27 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:27 - metaclaude_server - INFO - Using absolute path: /home/user/cerberus_ahk/screenrc
+2025-05-09 12:12:27 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:27 - metaclaude - DEBUG - Checking if server process is running, PID: 1539171
+2025-05-09 12:12:27 - metaclaude - DEBUG - Server process with PID 1539171 is running
+2025-05-09 12:12:27 - metaclaude_server - INFO - Created new file at /home/user/cerberus_ahk/screenrc.claude.
+2025-05-09 12:12:27 - metaclaude_server - INFO - Using absolute path: /home/user/cerberus_ahk/screenrc.claude
+2025-05-09 12:12:27 - metaclaude - INFO - Successfully discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:27 - metaclaude - DEBUG - Using discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:27 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:27 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:27 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:27 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:27 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:27 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:27 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:27 - metaclaude - INFO - Received command: poll_commands
+2025-05-09 12:12:27 - metaclaude - DEBUG - Using screen config file: /home/user/cerberus_ahk/screenrc.claude
+2025-05-09 12:12:28 - metaclaude_server - DEBUG - Session 0 is alive: Claude screen session exists
+2025-05-09 12:12:28 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:28 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:28 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:28 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:28 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:28 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:28 - metaclaude - INFO - Received command: poll_commands
+2025-05-09 12:12:29 - metaclaude_server - DEBUG - Session 0 is alive: tmux session exists
+2025-05-09 12:12:29 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:29 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:29 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:29 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:29 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:29 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:29 - metaclaude - INFO - Received command: poll_commands
+2025-05-09 12:12:29 - metaclaude - DEBUG - Generated unique screen session name: command_0_61ea3d46
+2025-05-09 12:12:29 - metaclaude - DEBUG - Using screen config file: /home/user/cerberus_ahk/screenrc
+2025-05-09 12:12:29 - metaclaude - DEBUG - Attaching to screen session with command: screen -x claude_process_b2dc948e
+2025-05-09 12:12:30 - metaclaude_server - DEBUG - Session 0 is alive: tmux session exists
+2025-05-09 12:12:30 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:30 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:30 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:30 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:30 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:30 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:30 - metaclaude - INFO - Received command: poll_commands
+2025-05-09 12:12:30 - metaclaude_server - INFO - Commands count: 1
+2025-05-09 12:12:30 - metaclaude_server - INFO - Command_statuses count: 1
+2025-05-09 12:12:30 - metaclaude_server - INFO - First command: python3 -m metaclaude.utils.dummy_process
+2025-05-09 12:12:30 - metaclaude_server - INFO - Queuing attach_tmux command for client to attach to session metaclaude_a50e0e34
+2025-05-09 12:12:30 - metaclaude_server - INFO - Queuing command for client 0: {'type': 'attach_tmux', 'session_name': 'metaclaude_a50e0e34'}
+2025-05-09 12:12:30 - metaclaude_server - INFO - Started crash monitoring mode in session monitor
+2025-05-09 12:12:31 - metaclaude - DEBUG - Attaching to screen session with command: screen -x command_0_61ea3d46
+2025-05-09 12:12:31 - metaclaude_server - DEBUG - Session 0 is alive: tmux session exists
+2025-05-09 12:12:31 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:31 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:31 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:31 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:31 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:31 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:31 - metaclaude - INFO - Received command: poll_commands
+2025-05-09 12:12:31 - metaclaude - INFO - Received command: {'type': 'attach_tmux', 'session_name': 'metaclaude_a50e0e34'}
+2025-05-09 12:12:31 - metaclaude - INFO - Attaching to tmux session: metaclaude_a50e0e34
+2025-05-09 12:12:31 - metaclaude - INFO - Attaching to tmux session metaclaude_a50e0e34 on TTY /dev/pts/9
+2025-05-09 12:12:32 - metaclaude_server - DEBUG - Session 0 is alive: tmux session exists
+2025-05-09 12:12:33 - metaclaude_server - DEBUG - Session 0 is alive: tmux session exists
+2025-05-09 12:12:34 - metaclaude_server - DEBUG - Session 0 is alive: tmux session exists
+2025-05-09 12:12:34 - metaclaude - DEBUG - 2025-05-09 12:12:34 - Command client main entry point, PID: 1539469, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:34 - metaclaude - DEBUG - 2025-05-09 12:12:34 - Arguments: ['/home/user/metaclaude/metaclaude/core/command_client.py', 'claude_process_b2dc948e', 'restart']
+2025-05-09 12:12:34 - metaclaude - DEBUG - 2025-05-09 12:12:34 - Current directory: /home/user/cerberus_ahk
+2025-05-09 12:12:34 - metaclaude - DEBUG - 2025-05-09 12:12:34 - User home: /home/user
+2025-05-09 12:12:34 - metaclaude - DEBUG - 2025-05-09 12:12:34 - Setting up direct logger, PID: 1539469, CWD: /home/user/cerberus_ahk, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:34 - metaclaude - DEBUG - 2025-05-09 12:12:34 - Environment variables: {'HOME': '/home/user', 'USER': 'user', 'TMPDIR': 'Not set', 'XDG_RUNTIME_DIR': '/run/user/1000/', 'STY': '1539213.claude_process_b2dc948e', 'TMUX': 'Not set'}
+2025-05-09 12:12:34 - metaclaude - DEBUG - 2025-05-09 12:12:35 - Trying to set up log files at: ['/home/user/cerberus_ahk/command_client.log', '/home/user/command_client.log', '/tmp/command_client.log', '/dev/shm/command_client.log']
+2025-05-09 12:12:35 - metaclaude - DEBUG - 2025-05-09 12:12:35 - Successfully set up log file: /home/user/cerberus_ahk/command_client.log
+2025-05-09 12:12:35 - metaclaude - DEBUG - 2025-05-09 12:12:35 - Successfully set up log file: /home/user/command_client.log
+2025-05-09 12:12:35 - metaclaude - DEBUG - 2025-05-09 12:12:35 - Successfully set up log file: /tmp/command_client.log
+2025-05-09 12:12:35 - metaclaude - DEBUG - 2025-05-09 12:12:35 - Successfully set up log file: /dev/shm/command_client.log
+2025-05-09 12:12:35 - metaclaude - DEBUG - 2025-05-09 12:12:35 - Logger setup completed successfully
+2025-05-09 12:12:35 - metaclaude - DEBUG - Command client starting, PID: 1539469
+2025-05-09 12:12:35 - metaclaude - DEBUG - Command client starting, PID: 1539469
+2025-05-09 12:12:35 - metaclaude - DEBUG - Arguments: screen_full_name='claude_process_b2dc948e', cmd='restart'
+2025-05-09 12:12:35 - metaclaude - DEBUG - Arguments: screen_full_name='claude_process_b2dc948e', cmd='restart'
+2025-05-09 12:12:35 - metaclaude - DEBUG - Environment: CWD=/home/user/cerberus_ahk
+2025-05-09 12:12:35 - metaclaude - DEBUG - Environment: CWD=/home/user/cerberus_ahk
+2025-05-09 12:12:35 - metaclaude - DEBUG - Environment variables: STY=1539213.claude_process_b2dc948e, TMUX=Not set
+2025-05-09 12:12:35 - metaclaude - DEBUG - Environment variables: STY=1539213.claude_process_b2dc948e, TMUX=Not set
+2025-05-09 12:12:35 - metaclaude - DEBUG - Potential metadata locations: [PosixPath('/home/user/.metaclaude.server.json'), '/tmp/metaclaude/.metaclaude.server.json', '/run/user/1000/metaclaude/.metaclaude.server.json', '/var/tmp/metaclaude/.metaclaude.server.json']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Potential metadata locations: [PosixPath('/home/user/.metaclaude.server.json'), '/tmp/metaclaude/.metaclaude.server.json', '/run/user/1000/metaclaude/.metaclaude.server.json', '/var/tmp/metaclaude/.metaclaude.server.json']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file exists: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file exists: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Content of /home/user/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - DEBUG - Content of /home/user/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking metadata file: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking metadata file: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file exists: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file exists: /tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Content of /tmp/metaclaude/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - DEBUG - Content of /tmp/metaclaude/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking metadata file: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking metadata file: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file exists: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file exists: /run/user/1000/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Content of /run/user/1000/metaclaude/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - DEBUG - Content of /run/user/1000/metaclaude/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking metadata file: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking metadata file: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file exists: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file exists: /var/tmp/metaclaude/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Content of /var/tmp/metaclaude/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - DEBUG - Content of /var/tmp/metaclaude/.metaclaude.server.json: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - DEBUG - Temp directory: /tmp, Metaclaude dir: /tmp/metaclaude
+2025-05-09 12:12:35 - metaclaude - DEBUG - Temp directory: /tmp, Metaclaude dir: /tmp/metaclaude
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking socket directory: /tmp/metaclaude
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking socket directory: /tmp/metaclaude
+2025-05-09 12:12:35 - metaclaude - DEBUG - Directory /tmp/metaclaude exists, contents: ['.metaclaude.server.json', 'metaclaude.sock']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Directory /tmp/metaclaude exists, contents: ['.metaclaude.server.json', 'metaclaude.sock']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Found socket files: ['metaclaude.sock']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Found socket files: ['metaclaude.sock']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking socket directory: /run/user/1000/metaclaude
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking socket directory: /run/user/1000/metaclaude
+2025-05-09 12:12:35 - metaclaude - DEBUG - Directory /run/user/1000/metaclaude exists, contents: ['.metaclaude.server.json']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Directory /run/user/1000/metaclaude exists, contents: ['.metaclaude.server.json']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking socket directory: /tmp/metaclaude
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking socket directory: /tmp/metaclaude
+2025-05-09 12:12:35 - metaclaude - DEBUG - Directory /tmp/metaclaude exists, contents: ['.metaclaude.server.json', 'metaclaude.sock']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Directory /tmp/metaclaude exists, contents: ['.metaclaude.server.json', 'metaclaude.sock']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Found socket files: ['metaclaude.sock']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Found socket files: ['metaclaude.sock']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking socket directory: /var/tmp/metaclaude
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking socket directory: /var/tmp/metaclaude
+2025-05-09 12:12:35 - metaclaude - DEBUG - Directory /var/tmp/metaclaude exists, contents: ['.metaclaude.server.json']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Directory /var/tmp/metaclaude exists, contents: ['.metaclaude.server.json']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Extracted session name: claude_process_b2dc948e
+2025-05-09 12:12:35 - metaclaude - DEBUG - Extracted session name: claude_process_b2dc948e
+2025-05-09 12:12:35 - metaclaude - DEBUG - Sending command: restart for session: claude_process_b2dc948e
+2025-05-09 12:12:35 - metaclaude - DEBUG - Sending command: restart for session: claude_process_b2dc948e
+2025-05-09 12:12:35 - metaclaude - DEBUG - Command client PID: 1539469
+2025-05-09 12:12:35 - metaclaude - DEBUG - Sending command 'restart' for Claude session 'claude_process_b2dc948e'
+2025-05-09 12:12:35 - metaclaude - DEBUG - Environment: CWD=/home/user/cerberus_ahk, HOME=/home/user
+2025-05-09 12:12:35 - metaclaude - DEBUG - Environment variables: STY=1539213.claude_process_b2dc948e, TMUX=Not set
+2025-05-09 12:12:35 - metaclaude - DEBUG - Python executable: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking temp directory: /tmp
+2025-05-09 12:12:35 - metaclaude - DEBUG - Contents of /tmp/metaclaude: ['.metaclaude.server.json', 'metaclaude.sock']
+2025-05-09 12:12:35 - metaclaude - DEBUG - Testing socket at: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Socket connection successful: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Starting socket discovery...
+2025-05-09 12:12:35 - metaclaude - INFO - Starting socket discovery, process PID: 1539469, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - INFO - Current working directory: /home/user/cerberus_ahk
+2025-05-09 12:12:35 - metaclaude - INFO - Home directory expansion: /home/user
+2025-05-09 12:12:35 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:35 - metaclaude - INFO - Looking for metadata file at: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file size: 143 bytes, modified: 1746817945.4053254
+2025-05-09 12:12:35 - metaclaude - DEBUG - Reading metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking if server process is running, PID: 1539171
+2025-05-09 12:12:35 - metaclaude - DEBUG - Server process with PID 1539171 is running
+2025-05-09 12:12:35 - metaclaude - INFO - Successfully discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Socket discovery returned: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Using discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - INFO - Socket class initialized from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - INFO - Socket module path: /home/user/metaclaude/metaclaude/net/socket.py
+2025-05-09 12:12:35 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:35 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:35 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Successfully connected to discovered socket
+2025-05-09 12:12:35 - metaclaude - DEBUG - Connected to server, sending command: restart
+2025-05-09 12:12:35 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:35 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:35 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:35 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:35 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:35 - metaclaude - INFO - Received command: restart
+2025-05-09 12:12:35 - metaclaude - INFO - RESTART COMMAND RECEIVED: restart, full message: {'command': 'restart', 'claude_session_name': 'claude_process_b2dc948e'}
+2025-05-09 12:12:35 - metaclaude - INFO - RESTART/EQUIVALENT COMMAND IDENTIFIED: restart
+2025-05-09 12:12:35 - metaclaude - INFO - All available claude sessions before restart: ['claude_process_b2dc948e']
+2025-05-09 12:12:35 - metaclaude - INFO - Starting restart for claude_process_b2dc948e in separate thread
+2025-05-09 12:12:35 - metaclaude_server - INFO - Request to restart session: 'claude_process_b2dc948e'
+2025-05-09 12:12:35 - metaclaude_server - INFO - Available claude sessions: ['claude_process_b2dc948e']
+2025-05-09 12:12:35 - metaclaude_server - INFO - Found session with UID 0, performing full restart
+2025-05-09 12:12:35 - metaclaude - DEBUG - Command result: {'status': 'success', 'message': 'Restart command received, processing in background'}
+2025-05-09 12:12:35 - metaclaude_server - INFO - Starting full restart of session 0
+2025-05-09 12:12:35 - metaclaude_server - INFO - Killing all processes
+2025-05-09 12:12:35 - metaclaude - DEBUG - Command result: True
+2025-05-09 12:12:35 - metaclaude - DEBUG - Command result: True
+2025-05-09 12:12:35 - metaclaude - DEBUG - Command succeeded
+2025-05-09 12:12:35 - metaclaude - DEBUG - Command succeeded
+2025-05-09 12:12:35 - metaclaude - DEBUG - Released screen session name: command_0_61ea3d46
+2025-05-09 12:12:35 - metaclaude_server - INFO - Stopping Claude screen session
+2025-05-09 12:12:35 - metaclaude_server - INFO - Claude screen session stopped
+2025-05-09 12:12:35 - metaclaude_server - INFO - Killing tmux session
+2025-05-09 12:12:35 - metaclaude_server - INFO - Tmux session killed
+2025-05-09 12:12:35 - metaclaude - INFO - Tmux session detached or closed
+2025-05-09 12:12:35 - metaclaude_server - INFO - Cleaning up session <metaclaude.core.session.Session object at 0x7f7607205760>
+2025-05-09 12:12:35 - metaclaude_server - WARNING - Session <metaclaude.core.session.Session object at 0x7f7607205760> not found, nothing to clean up
+2025-05-09 12:12:35 - metaclaude - INFO - Session 0 completed successfully
+2025-05-09 12:12:35 - metaclaude_server - DEBUG - Session 0 appears dead: tmux=metaclaude_a50e0e34, claude=claude_process_b2dc948e
+2025-05-09 12:12:35 - metaclaude_server - INFO - Session 0 appears to be dead, cleaning up
+2025-05-09 12:12:35 - metaclaude_server - INFO - Cleaning up session 0
+2025-05-09 12:12:35 - metaclaude - ERROR - Session 'command_0_61ea3d46' does not exist.
+2025-05-09 12:12:35 - metaclaude - DEBUG - Released screen session name: claude_process_b2dc948e
+2025-05-09 12:12:35 - metaclaude_server - INFO - Session 0 cleaned up successfully
+2025-05-09 12:12:35 - metaclaude - INFO - Received signal to terminate. Cleaning up...
+2025-05-09 12:12:35 - metaclaude - INFO - Socket class initialized from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - INFO - Socket module path: /home/user/metaclaude/metaclaude/net/socket.py
+2025-05-09 12:12:35 - metaclaude - INFO - Starting socket discovery, process PID: 1539167, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - INFO - Current working directory: /home/user/cerberus_ahk
+2025-05-09 12:12:35 - metaclaude - INFO - Home directory expansion: /home/user
+2025-05-09 12:12:35 - metaclaude - INFO - Looking for metadata file at: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file size: 143 bytes, modified: 1746817945.4053254
+2025-05-09 12:12:35 - metaclaude - DEBUG - Reading metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking if server process is running, PID: 1539171
+2025-05-09 12:12:35 - metaclaude - DEBUG - Server process with PID 1539171 is running
+2025-05-09 12:12:35 - metaclaude - INFO - Successfully discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Using discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:35 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:35 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:35 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:35 - metaclaude - INFO - Received command: cleanup_session
+2025-05-09 12:12:35 - metaclaude - INFO - Socket class initialized from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - INFO - Socket module path: /home/user/metaclaude/metaclaude/net/socket.py
+2025-05-09 12:12:35 - metaclaude - INFO - Starting socket discovery, process PID: 1539167, Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - INFO - Current working directory: /home/user/cerberus_ahk
+2025-05-09 12:12:35 - metaclaude - INFO - Home directory expansion: /home/user
+2025-05-09 12:12:35 - metaclaude - INFO - Looking for metadata file at: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file size: 143 bytes, modified: 1746817945.4053254
+2025-05-09 12:12:35 - metaclaude - INFO - Starting cleanup for session 0 in separate thread
+2025-05-09 12:12:35 - metaclaude - DEBUG - Reading metadata file: /home/user/.metaclaude.server.json
+2025-05-09 12:12:35 - metaclaude - DEBUG - Metadata file content: {"socket_path": "/tmp/metaclaude/metaclaude.sock", "server_pid": 1539171, "timestamp": 1746817945.4193892, "start_time": "2025-05-09 12:12:25"}
+2025-05-09 12:12:35 - metaclaude - INFO - Found socket path in metadata: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - WARNING - Session 0 not found for cleanup
+2025-05-09 12:12:35 - metaclaude - DEBUG - Checking if server process is running, PID: 1539171
+2025-05-09 12:12:35 - metaclaude - DEBUG - Server process with PID 1539171 is running
+2025-05-09 12:12:35 - metaclaude - INFO - Successfully discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Using discovered socket path: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - INFO - Attempting to connect to socket from Python: /home/user/metaclaude/venv/bin/python3
+2025-05-09 12:12:35 - metaclaude - INFO - Client socket module path: /home/user/metaclaude/metaclaude/net/client_socket.py
+2025-05-09 12:12:35 - metaclaude - INFO - Socket path to connect to: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:35 - metaclaude - INFO - Connecting to socket at /tmp/metaclaude/metaclaude.sock...
+2025-05-09 12:12:35 - metaclaude - INFO - Successfully connected to socket: /tmp/metaclaude/metaclaude.sock
+2025-05-09 12:12:35 - metaclaude - DEBUG - Accepted connection from 
+2025-05-09 12:12:35 - metaclaude - INFO - Received command: cleanup_session
+2025-05-09 12:12:35 - metaclaude - INFO - Session 0 has been cleaned up
+2025-05-09 12:12:35 - metaclaude - INFO - Starting cleanup for session 0 in separate thread
+2025-05-09 12:12:35 - metaclaude - WARNING - Session 0 not found for cleanup
+2025-05-09 12:12:36 - metaclaude_server - INFO - Starting Claude CLI
+2025-05-09 12:12:36 - metaclaude - DEBUG - Using screen config file: /home/user/cerberus_ahk/screenrc.claude
+2025-05-09 12:12:38 - metaclaude_server - INFO - Claude screen session started successfully
+2025-05-09 12:12:38 - metaclaude_server - INFO - Creating new tmux session
+2025-05-09 12:12:39 - metaclaude - DEBUG - Attaching to screen session with command: screen -x claude_process_b2dc948e
+2025-05-09 12:12:39 - metaclaude_server - INFO - Tmux session created successfully
+2025-05-09 12:12:39 - metaclaude_server - INFO - Reloading plugins, commands, and layout
+2025-05-09 12:12:39 - metaclaude_server - INFO - commands.txt already exists at /home/user/cerberus_ahk/commands.txt
+2025-05-09 12:12:39 - metaclaude_server - INFO - Using commands.txt at absolute path: /home/user/cerberus_ahk/commands.txt
+2025-05-09 12:12:39 - metaclaude_server - INFO - Created new file at /home/user/cerberus_ahk/CLAUDE.md.
+2025-05-09 12:12:39 - metaclaude_server - INFO - Using absolute path: /home/user/cerberus_ahk/CLAUDE.md
+2025-05-09 12:12:39 - metaclaude_server - INFO - Created new file at /home/user/cerberus_ahk/screenrc.
+2025-05-09 12:12:39 - metaclaude_server - INFO - Using absolute path: /home/user/cerberus_ahk/screenrc
+2025-05-09 12:12:39 - metaclaude_server - INFO - Created new file at /home/user/cerberus_ahk/screenrc.claude.
+2025-05-09 12:12:39 - metaclaude_server - INFO - Using absolute path: /home/user/cerberus_ahk/screenrc.claude
+2025-05-09 12:12:39 - metaclaude - DEBUG - Generated unique screen session name: command_0_655a7f3f
+2025-05-09 12:12:39 - metaclaude - DEBUG - Using screen config file: /home/user/cerberus_ahk/screenrc
+2025-05-09 12:12:40 - metaclaude_server - INFO - Commands count: 1
+2025-05-09 12:12:40 - metaclaude_server - INFO - Command_statuses count: 1
+2025-05-09 12:12:40 - metaclaude_server - INFO - First command: python3 -m metaclaude.utils.dummy_process
+2025-05-09 12:12:40 - metaclaude_server - INFO - Setting up tmux attach command
+2025-05-09 12:12:40 - metaclaude_server - INFO - Queuing attach_tmux command for client to attach to session metaclaude_a50e0e34
+2025-05-09 12:12:40 - metaclaude_server - INFO - Queuing command for client 0: {'type': 'attach_tmux', 'session_name': 'metaclaude_a50e0e34'}
+2025-05-09 12:12:40 - metaclaude_server - INFO - Forcing all queued commands to be sent to clients
+2025-05-09 12:12:40 - metaclaude_server - INFO - Sending queued command to client: {'type': 'attach_tmux', 'session_name': 'metaclaude_a50e0e34'}
+2025-05-09 12:12:40 - metaclaude_server - INFO - Session details after restart: tmux=metaclaude_a50e0e34, claude=claude_process_b2dc948e
+2025-05-09 12:12:40 - metaclaude_server - INFO - Client TTY map: {}
+2025-05-09 12:12:40 - metaclaude_server - INFO - Client command queues: {0: []}
+2025-05-09 12:12:40 - metaclaude_server - INFO - Explicitly triggering client reattachment
+2025-05-09 12:12:40 - metaclaude_server - INFO - Queuing command for client 0: {'type': 'attach_tmux', 'session_name': 'metaclaude_a50e0e34'}
+2025-05-09 12:12:40 - metaclaude_server - INFO - Full restart of session 0 completed successfully
+2025-05-09 12:12:40 - metaclaude_server - INFO - Session 0 restart completed
+2025-05-09 12:12:40 - metaclaude - INFO - Restart for claude_process_b2dc948e completed successfully
+2025-05-09 12:12:41 - metaclaude - DEBUG - Attaching to screen session with command: screen -x command_0_655a7f3f

@@ -1,0 +1,29 @@
+# Basic screen configuration for command windows
+
+# Set escape key to backtick (`) instead of Ctrl-A
+escape `
+
+# Set a large scrollback buffer
+defscrollback 10000
+
+# Disable visual bell
+vbell off
+
+# Set the terminal type
+term xterm-256color
+
+# Display a status line at the bottom
+hardstatus alwayslastline
+hardstatus string '%{= kG}[ %{G}%H %{g}][%= %{= kw}%?%-Lw%?%{r}(%{W}%n*%f%t%?(%u)%?%{r})%{w}%?%+Lw%?%?%= %{g}][%{B} %d/%m %{W}%c %{g}]'
+
+# Allow bold colors - necessary for some reason
+attrcolor b ".I"
+
+# Tell screen how to set colors. AB = background, AF=foreground
+termcapinfo xterm 'Co#256:AB=\E[48;5;%dm:AF=\E[38;5;%dm'
+
+# Enable 256 color term
+term screen-256color
+
+# Allow scrolling with mouse
+termcapinfo xterm* ti@:te@

@@ -38,8 +38,8 @@ CoordMode("Mouse", "Screen") ; Set mouse coordinates to be relative to screen
 SetWinDelay(50) ; Increase window operation delay for more reliable actions
 DetectHiddenWindows(False) ; Don't track hidden windows
 
-InitializeWorkspaces() ; Call to initialize workspaces when script starts
-InitializeOverlays() ; Create workspace overlay displays
+InitializeWorkspaces() ; Call to initialize workspaces when script starts - sets up monitor-workspace mapping and assigns windows
+InitializeOverlays() ; Create workspace overlay displays - adds visual indicators for workspace numbers
 
 InitializeWorkspaces() {
     OutputDebug("============ INITIALIZING WORKSPACES ============")
@@ -112,11 +112,11 @@ InitializeWorkspaces() {
     OutputDebug("============ INITIALIZATION COMPLETE ============")
     
     ; Display a tray tip with the number of windows assigned
-    TrayTip("Cerberus initialized", "Assigned " assignedCount " windows to workspaces")
+    TrayTip("Cerberus initialized", "Assigned " assignedCount " windows to workspaces") ; Shows notification in system tray
 }
 
 ; ====== Helper Functions ======
-IsWindowValid(hwnd) {
+IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
     if !WinExist(hwnd) ; Checks if window exists
         return false
     
@@ -159,7 +159,7 @@ IsWindowValid(hwnd) {
     return true
 }
 
-GetWindowMonitor(hwnd) {
+GetWindowMonitor(hwnd) { ; Determines which monitor contains the window
     monitorCount := MonitorGetCount() ; Gets the total number of monitors
     
     if (monitorCount = 1)
@@ -182,7 +182,7 @@ GetWindowMonitor(hwnd) {
     return 1
 }
 
-GetActiveMonitor() {
+GetActiveMonitor() { ; Gets the monitor index where the active window is located
     ; Get active window
     activeHwnd := WinExist("A") ; Gets handle of active window
     if !activeHwnd
@@ -191,7 +191,7 @@ GetActiveMonitor() {
     return GetWindowMonitor(activeHwnd) ; Gets monitor index for active window
 }
 
-SaveWindowLayout(hwnd, workspaceID) {
+SaveWindowLayout(hwnd, workspaceID) { ; Stores window position and state for later restoration
     if !IsWindowValid(hwnd) || workspaceID < 1 || workspaceID > MAX_WORKSPACES
         return
         
@@ -215,7 +215,7 @@ SaveWindowLayout(hwnd, workspaceID) {
     }
 }
 
-RestoreWindowLayout(hwnd, workspaceID) {
+RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved position and state
     ; Check if window exists and is valid
     if !IsWindowValid(hwnd) {
         OutputDebug("RESTORE FAILED: Window " hwnd " is not valid")
@@ -266,7 +266,7 @@ RestoreWindowLayout(hwnd, workspaceID) {
     WinActivate("ahk_id " hwnd)
 }
 
-MinimizeWorkspaceWindows(workspaceID) {
+MinimizeWorkspaceWindows(workspaceID) { ; Minimizes all windows in the specified workspace
     OutputDebug("Minimizing all windows for workspace " workspaceID)
     
     ; Get all open windows
@@ -299,7 +299,7 @@ MinimizeWorkspaceWindows(workspaceID) {
     OutputDebug("Minimized " minimizedCount " windows for workspace " workspaceID)
 }
 
-RestoreWorkspaceWindows(workspaceID) {
+RestoreWorkspaceWindows(workspaceID) { ; Restores all minimized windows for the specified workspace
     OutputDebug("Restoring all windows for workspace " workspaceID)
     
     ; Get all open windows
@@ -337,7 +337,7 @@ RestoreWorkspaceWindows(workspaceID) {
     OutputDebug("Restored " restoredCount " windows for workspace " workspaceID)
 }
 
-SwitchToWorkspace(requestedID) {
+SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     if (requestedID < 1 || requestedID > MAX_WORKSPACES)
         return
         
@@ -542,7 +542,7 @@ SwitchToWorkspace(requestedID) {
 }
 
 ; Helper function to find which monitor a workspace should be on
-monitorForWorkspace(workspaceID) {
+monitorForWorkspace(workspaceID) { ; Finds which monitor is displaying the specified workspace
     for monIndex, wsID in MonitorWorkspaces {
         if (wsID = workspaceID)
             return monIndex
@@ -570,7 +570,7 @@ monitorForWorkspace(workspaceID) {
 OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE - Registers a handler for window move events
 OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE - Registers a handler for window resize events
 
-WindowMoveResizeHandler(wParam, lParam, msg, hwnd) {
+WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resize events to update saved layouts
     ; Don't track minimized windows
     if (WinGetMinMax(hwnd) = -1) ; Checks if window is minimized
         return
@@ -586,13 +586,13 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) {
 ; This event provides an hwnd when a window is created
 OnMessage(0x0001, NewWindowHandler)  ; WM_CREATE - Registers a handler for window creation events
 
-NewWindowHandler(wParam, lParam, msg, hwnd) {
+NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events to assign new windows
     ; Give the window a moment to initialize fully before assigning
     ; This helps ensure window properties and position are stable
     SetTimer(() => AssignNewWindow(hwnd), -1000) ; Increased timer to 1 second for better stability
 }
 
-AssignNewWindow(hwnd) {
+AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace
     ; Check again if the window exists and is valid - it might have closed already
     if (!WinExist(hwnd) || !IsWindowValid(hwnd))
         return
@@ -638,7 +638,7 @@ AssignNewWindow(hwnd) {
 }
 
 ; ====== Workspace Overlay Functions ======
-InitializeOverlays() {
+InitializeOverlays() { ; Creates and displays workspace number indicators on all monitors
     ; Create an overlay for each monitor
     monitorCount := MonitorGetCount() ; Gets the total number of monitors
     
@@ -653,7 +653,7 @@ InitializeOverlays() {
     ; No timer needed as we're using persistent overlays
 }
 
-CreateOverlay(monitorIndex) {
+CreateOverlay(monitorIndex) { ; Creates workspace indicator overlay for specified monitor
     ; Get monitor dimensions
     MonitorGetWorkArea(monitorIndex, &mLeft, &mTop, &mRight, &mBottom) ; Gets coordinates of monitor
     
@@ -699,7 +699,7 @@ CreateOverlay(monitorIndex) {
     ; Overlay is already shown above
 }
 
-UpdateAllOverlays() {
+UpdateAllOverlays() { ; Updates all workspace number indicators
     ; Update and show all overlays
     for monitorIndex, overlay in WorkspaceOverlays {
         UpdateOverlay(monitorIndex)
@@ -708,7 +708,7 @@ UpdateAllOverlays() {
     ; No timer needed as we're using persistent overlays
 }
 
-UpdateOverlay(monitorIndex) {
+UpdateOverlay(monitorIndex) { ; Updates the workspace indicator for specified monitor
     ; Update overlay content to show current workspace ID
     if (!WorkspaceOverlays.Has(monitorIndex))
         return
@@ -741,14 +741,14 @@ UpdateOverlay(monitorIndex) {
     overlay.Show("NoActivate") ; Shows the overlay without activating it
 }
 
-HideAllOverlays() {
+HideAllOverlays() { ; Hides all workspace indicators
     ; Hide all overlays
     for monitorIndex, overlay in WorkspaceOverlays {
         overlay.Hide() ; Hides the overlay
     }
 }
 
-ToggleOverlays() {
+ToggleOverlays() { ; Toggles visibility of workspace indicators
     ; Toggle overlay visibility
     static isVisible := true
     
@@ -759,7 +759,7 @@ ToggleOverlays() {
         
         ; Reset hide timer if using timeout
         if (OVERLAY_TIMEOUT > 0) {
-            SetTimer(HideAllOverlays, -OVERLAY_TIMEOUT)
+            SetTimer(HideAllOverlays, -OVERLAY_TIMEOUT) ; Sets timer to hide overlays after specified delay
         }
     }
     

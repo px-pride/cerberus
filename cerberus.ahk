@@ -393,6 +393,23 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
 }
 
 ; ----- Event Handlers -----
+
+; Helper function for delayed window checking
+DelayedWindowCheck(hwnd, *) {
+    ; Reference global variables
+    global DEBUG_MODE
+
+    ; Only call AssignNewWindow if window is still valid
+    try {
+        if (WinExist("ahk_id " hwnd))
+            AssignNewWindow(hwnd)
+        else if (DEBUG_MODE)
+            OutputDebug("Skipping delayed assignment for window " hwnd " - no longer exists")
+    } catch Error as err {
+        if (DEBUG_MODE)
+            OutputDebug("Error in delayed window assignment timer: " err.Message)
+    }
+}
 SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     ; Reference global variables
     global SWITCH_IN_PROGRESS, DEBUG_MODE, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
@@ -902,41 +919,14 @@ NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events t
 
     ; Also queue a delayed assignment to catch any window movement or initialization issues
     ; This helps ensure window properties and position are stable after initial creation
-    ; Store the hwnd in a static object to prevent errors if window is destroyed before timer fires
-    if (!IsSet(NewWindowHandler.PendingAssignments))
-        NewWindowHandler.PendingAssignments := Map()
 
-    ; Generate a unique timer ID
-    timerId := "NewWindowCheck_" hwnd
+    ; Use a simpler approach - store the hwnd in a variable that's accessible to the function
+    local_hwnd := hwnd
 
-    ; Store the hwnd in our map
-    NewWindowHandler.PendingAssignments[timerId] := hwnd
+    ; Use a traditional function-based approach with SetTimer
+    SetTimer(DelayedWindowCheck.Bind(local_hwnd), -1000)
 
-    ; Set a timer with an anonymous function that checks if the window still exists
-    SetTimer((*) =>
-    {
-        ; Make necessary globals available in this context
-        global DEBUG_MODE
-
-        ; Get the pending hwnd from our map
-        if (NewWindowHandler.PendingAssignments.Has(timerId)) {
-            pendingHwnd := NewWindowHandler.PendingAssignments[timerId]
-
-            ; Remove it from the tracking map regardless of result
-            NewWindowHandler.PendingAssignments.Delete(timerId)
-
-            ; Only call AssignNewWindow if window is still valid
-            try {
-                if (WinExist("ahk_id " pendingHwnd))
-                    AssignNewWindow(pendingHwnd)
-                else if (DEBUG_MODE)
-                    OutputDebug("Skipping delayed assignment for window " pendingHwnd " - no longer exists")
-            } catch Error as err {
-                if (DEBUG_MODE)
-                    OutputDebug("Error in delayed window assignment timer: " err.Message)
-            }
-        }
-    }, -1000) ; Run a follow-up check after 1 second
+    ; The DelayedWindowCheck function will be defined separately to handle the check
 }
 
 AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed follow-up check)

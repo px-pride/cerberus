@@ -383,265 +383,286 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
     }
 }
 
+; ----- Event Handlers -----
 SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
+    ; Early exit conditions
     if (requestedID < 1 || requestedID > MAX_WORKSPACES)
         return
 
-    ; Debug output to help diagnose issues
-    if (DEBUG_MODE) {
-        OutputDebug("------------- WORKSPACE SWITCH START -------------")
-        OutputDebug("Switching to workspace: " requestedID)
-    }
-
-    ; Get active monitor
-    activeMonitor := GetActiveMonitor() ; Gets the monitor index that contains the currently active (focused) window
-    if (DEBUG_MODE)
-        OutputDebug("Active monitor: " activeMonitor)
-
-    ; Get current workspace ID for active monitor
-    currentWorkspaceID := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 1 ; Gets current workspace ID for active monitor, defaults to 1 if not found
-    if (DEBUG_MODE)
-        OutputDebug("Current workspace on active monitor: " currentWorkspaceID)
-
-    ; If already on requested workspace, do nothing
-    if (currentWorkspaceID = requestedID) {
+    ; Check if another switch operation is already in progress
+    if (SWITCH_IN_PROGRESS) {
         if (DEBUG_MODE)
-            OutputDebug("Already on requested workspace. No action needed.")
+            OutputDebug("Another workspace switch already in progress, ignoring request")
         return
     }
 
-    ; Check if the requested workspace is already on another monitor - direct swap approach
-    otherMonitor := 0
-    for monIndex, workspaceID in MonitorWorkspaces {
-        if (monIndex != activeMonitor && workspaceID = requestedID) {
-            otherMonitor := monIndex
-            if (DEBUG_MODE)
-                OutputDebug("Found requested workspace on monitor: " otherMonitor)
-            break
-        }
-    }
-
-    if (otherMonitor > 0) {
-        ; === PERFORMING WORKSPACE EXCHANGE BETWEEN MONITORS ===
-        if (DEBUG_MODE)
-            OutputDebug("Performing workspace exchange between monitors " activeMonitor " and " otherMonitor)
-
-        ; Get monitor dimensions
-        MonitorGetWorkArea(activeMonitor, &aLeft, &aTop, &aRight, &aBottom)
-        MonitorGetWorkArea(otherMonitor, &oLeft, &oTop, &oRight, &oBottom)
-
-        ; Calculate offset between monitors (to maintain relative positions)
-        offsetX := aLeft - oLeft
-        offsetY := aTop - oTop
-
-        ; Get all open windows
-        windows := WinGetList()
-        if (DEBUG_MODE)
-            OutputDebug("Found " windows.Length " total windows")
-
-        ; Collect windows on each monitor
-        activeMonitorWindows := []
-        otherMonitorWindows := []
-
-        for index, hwnd in windows {
-            ; Skip invalid windows
-            if (!IsWindowValid(hwnd))
-                continue
-
-            ; Get window monitor
-            windowMonitor := GetWindowMonitor(hwnd)
-
-            ; Collect windows by monitor
-            if (windowMonitor = activeMonitor)
-                activeMonitorWindows.Push(hwnd)
-            else if (windowMonitor = otherMonitor)
-                otherMonitorWindows.Push(hwnd)
-        }
-
+    ; Set the flag to indicate switch is in progress
+    SWITCH_IN_PROGRESS := True
+    
+    try {
+        ; Debug output to help diagnose issues
         if (DEBUG_MODE) {
-            OutputDebug("Found " activeMonitorWindows.Length " windows on active monitor and "
-                otherMonitorWindows.Length " windows on other monitor")
+            OutputDebug("------------- WORKSPACE SWITCH START -------------")
+            OutputDebug("Switching to workspace: " requestedID)
         }
 
-        ; Step 1: Swap workspace IDs between monitors
+        ; Get active monitor
+        activeMonitor := GetActiveMonitor() ; Gets the monitor index that contains the currently active (focused) window
         if (DEBUG_MODE)
-            OutputDebug("Swapping workspace IDs: " currentWorkspaceID " and " requestedID)
-        MonitorWorkspaces[otherMonitor] := currentWorkspaceID
-        MonitorWorkspaces[activeMonitor] := requestedID
+            OutputDebug("Active monitor: " activeMonitor)
 
-        ; Step 2: Move windows from active monitor to other monitor
-        for index, hwnd in activeMonitorWindows {
-            try {
-                ; Get window position and state
-                WinGetPos(&x, &y, &width, &height, hwnd)
-                isMaximized := WinGetMinMax(hwnd) = 1
+        ; Get current workspace ID for active monitor
+        currentWorkspaceID := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 1 ; Gets current workspace ID for active monitor, defaults to 1 if not found
+        if (DEBUG_MODE)
+            OutputDebug("Current workspace on active monitor: " currentWorkspaceID)
 
-                if (DEBUG_MODE) {
-                    title := WinGetTitle(hwnd)
-                    OutputDebug("Moving window from active to other monitor: " title)
-                }
+        ; If already on requested workspace, do nothing
+        if (currentWorkspaceID = requestedID) {
+            if (DEBUG_MODE)
+                OutputDebug("Already on requested workspace. No action needed.")
+            SWITCH_IN_PROGRESS := False ; Clear flag before early return
+            return
+        }
 
-                ; Move window, preserving layout
-                if (isMaximized) {
-                    ; First restore to normal, move, then maximize again
-                    if (WinGetMinMax(hwnd) = 1)
-                        WinRestore("ahk_id " hwnd)
-
-                    ; Move to new position
-                    WinMove(x - offsetX, y - offsetY, width, height, "ahk_id " hwnd)
-
-                    ; Maximize again
-                    WinMaximize("ahk_id " hwnd)
-                } else {
-                    ; For non-maximized windows, just move them
-                    WinMove(x - offsetX, y - offsetY, width, height, "ahk_id " hwnd)
-                }
-
-                Sleep(30) ; Short delay to prevent overwhelming the system
-            } catch Error as err {
+        ; Check if the requested workspace is already on another monitor - direct swap approach
+        otherMonitor := 0
+        for monIndex, workspaceID in MonitorWorkspaces {
+            if (monIndex != activeMonitor && workspaceID = requestedID) {
+                otherMonitor := monIndex
                 if (DEBUG_MODE)
-                    OutputDebug("ERROR moving window: " err.Message)
+                    OutputDebug("Found requested workspace on monitor: " otherMonitor)
+                break
             }
         }
 
-        ; Step 3: Move windows from other monitor to active monitor
-        for index, hwnd in otherMonitorWindows {
-            try {
-                ; Get window position and state
-                WinGetPos(&x, &y, &width, &height, hwnd)
-                isMaximized := WinGetMinMax(hwnd) = 1
+        if (otherMonitor > 0) {
+            ; === PERFORMING WORKSPACE EXCHANGE BETWEEN MONITORS ===
+            if (DEBUG_MODE)
+                OutputDebug("Performing workspace exchange between monitors " activeMonitor " and " otherMonitor)
 
-                if (DEBUG_MODE) {
-                    title := WinGetTitle(hwnd)
-                    OutputDebug("Moving window from other to active monitor: " title)
-                }
+            ; Get monitor dimensions
+            MonitorGetWorkArea(activeMonitor, &aLeft, &aTop, &aRight, &aBottom)
+            MonitorGetWorkArea(otherMonitor, &oLeft, &oTop, &oRight, &oBottom)
+            
+            ; Calculate offset between monitors (to maintain relative positions)
+            offsetX := aLeft - oLeft
+            offsetY := aTop - oTop
+            
+            ; Get all open windows
+            windows := WinGetList()
+            if (DEBUG_MODE)
+                OutputDebug("Found " windows.Length " total windows")
 
-                ; Move window, preserving layout
-                if (isMaximized) {
-                    ; First restore to normal, move, then maximize again
-                    if (WinGetMinMax(hwnd) = 1)
-                        WinRestore("ahk_id " hwnd)
+            ; Collect windows on each monitor
+            activeMonitorWindows := []
+            otherMonitorWindows := []
+            
+            for index, hwnd in windows {
+                ; Skip invalid windows
+                if (!IsWindowValid(hwnd))
+                    continue
 
-                    ; Move to new position
-                    WinMove(x + offsetX, y + offsetY, width, height, "ahk_id " hwnd)
-
-                    ; Maximize again
-                    WinMaximize("ahk_id " hwnd)
-                } else {
-                    ; For non-maximized windows, just move them
-                    WinMove(x + offsetX, y + offsetY, width, height, "ahk_id " hwnd)
-                }
-
-                Sleep(30) ; Short delay to prevent overwhelming the system
-            } catch Error as err {
-                if (DEBUG_MODE)
-                    OutputDebug("ERROR moving window: " err.Message)
+                ; Get window monitor
+                windowMonitor := GetWindowMonitor(hwnd)
+                
+                ; Collect windows by monitor
+                if (windowMonitor = activeMonitor)
+                    activeMonitorWindows.Push(hwnd)
+                else if (windowMonitor = otherMonitor)
+                    otherMonitorWindows.Push(hwnd)
             }
-        }
-
-        if (DEBUG_MODE)
-            OutputDebug("Moved windows between monitors while preserving layout")
-    }
-    else {
-        ; === STANDARD WORKSPACE SWITCH (NO EXCHANGE) ===
-        if (DEBUG_MODE)
-            OutputDebug("Standard workspace switch - no exchange needed")
-
-        ; ====== STEP 1: Identify and minimize all windows on the active monitor ======
-        ; Get all open windows
-        windows := WinGetList() ; Gets a list of all open windows
-        if (DEBUG_MODE)
-            OutputDebug("Found " windows.Length " total windows")
-
-        ; Process each window
-        for index, hwnd in windows {
-            ; Skip invalid windows
-            if (!IsWindowValid(hwnd))
-                continue
-
-            ; Check if window is on active monitor
-            windowMonitor := GetWindowMonitor(hwnd)
-            if (windowMonitor = activeMonitor) {
-                ; Directly minimize the window on active monitor
-                title := WinGetTitle(hwnd)
-                if (DEBUG_MODE)
-                    OutputDebug("MINIMIZING window on active monitor: " title)
-
-                ; Force the window to minimize
+            
+            if (DEBUG_MODE) {
+                OutputDebug("Found " activeMonitorWindows.Length " windows on active monitor and " 
+                    otherMonitorWindows.Length " windows on other monitor")
+            }
+            
+            ; Step 1: Swap workspace IDs between monitors
+            if (DEBUG_MODE)
+                OutputDebug("Swapping workspace IDs: " currentWorkspaceID " and " requestedID)
+            MonitorWorkspaces[otherMonitor] := currentWorkspaceID
+            MonitorWorkspaces[activeMonitor] := requestedID
+            
+            ; Step 2: Move windows from active monitor to other monitor
+            for index, hwnd in activeMonitorWindows {
                 try {
-                    WinMinimize("ahk_id " hwnd)
-                    Sleep(50) ; Delay to allow minimize operation to complete
-                } catch Error as err {
-                    if (DEBUG_MODE)
-                        OutputDebug("ERROR minimizing window: " err.Message)
-                }
-            }
-        }
-
-        ; ====== STEP 2: Change workspace ID for active monitor ======
-        ; Update the workspace ID for the active monitor
-        MonitorWorkspaces[activeMonitor] := requestedID
-        if (DEBUG_MODE)
-            OutputDebug("Changed active monitor workspace to: " requestedID)
-
-        ; Force a delay to allow minimizations to complete
-        Sleep(300)
-
-        ; ====== STEP 3: Restore windows belonging to requested workspace ======
-        restoreCount := 0
-
-        ; Get all windows again (in case things changed)
-        windows := WinGetList()
-
-        ; Process each window
-        for index, hwnd in windows {
-            ; Skip invalid windows
-            if (!IsWindowValid(hwnd))
-                continue
-
-            ; Get window info
-            title := WinGetTitle(hwnd)
-            windowMonitor := GetWindowMonitor(hwnd)
-            winState := WinGetMinMax(hwnd)
-
-            ; Check if window is on active monitor
-            if (windowMonitor = activeMonitor) {
-                ; This is a window that should be restored for the new workspace
-                if (DEBUG_MODE)
-                    OutputDebug("RESTORING window for new workspace: " title)
-
-                ; Force window restore - the WindowMoveResizeHandler will handle workspace assignment
-                try {
-                    ; Restore from minimized state if needed
-                    if (winState = -1) {
-                        WinRestore("ahk_id " hwnd)
+                    ; Get window position and state
+                    WinGetPos(&x, &y, &width, &height, hwnd)
+                    isMaximized := WinGetMinMax(hwnd) = 1
+                    
+                    if (DEBUG_MODE) {
+                        title := WinGetTitle(hwnd)
+                        OutputDebug("Moving window from active to other monitor: " title)
                     }
-
-                    ; Note: WindowWorkspaces is now updated by event handlers, not directly here
-                    SaveWindowLayout(hwnd, requestedID)
-
-                    restoreCount++
-                    Sleep(30) ; Delay to allow restore operation to complete
+                    
+                    ; Move window, preserving layout
+                    if (isMaximized) {
+                        ; First restore to normal, move, then maximize again
+                        if (WinGetMinMax(hwnd) = 1)
+                            WinRestore("ahk_id " hwnd)
+                        
+                        ; Move to new position
+                        WinMove(x - offsetX, y - offsetY, width, height, "ahk_id " hwnd)
+                        
+                        ; Maximize again
+                        WinMaximize("ahk_id " hwnd)
+                    } else {
+                        ; For non-maximized windows, just move them
+                        WinMove(x - offsetX, y - offsetY, width, height, "ahk_id " hwnd)
+                    }
+                    
+                    Sleep(30) ; Short delay to prevent overwhelming the system
                 } catch Error as err {
                     if (DEBUG_MODE)
-                        OutputDebug("ERROR restoring window: " err.Message)
+                        OutputDebug("ERROR moving window: " err.Message)
                 }
             }
+            
+            ; Step 3: Move windows from other monitor to active monitor
+            for index, hwnd in otherMonitorWindows {
+                try {
+                    ; Get window position and state
+                    WinGetPos(&x, &y, &width, &height, hwnd)
+                    isMaximized := WinGetMinMax(hwnd) = 1
+                    
+                    if (DEBUG_MODE) {
+                        title := WinGetTitle(hwnd)
+                        OutputDebug("Moving window from other to active monitor: " title)
+                    }
+                    
+                    ; Move window, preserving layout
+                    if (isMaximized) {
+                        ; First restore to normal, move, then maximize again
+                        if (WinGetMinMax(hwnd) = 1)
+                            WinRestore("ahk_id " hwnd)
+                        
+                        ; Move to new position
+                        WinMove(x + offsetX, y + offsetY, width, height, "ahk_id " hwnd)
+                        
+                        ; Maximize again
+                        WinMaximize("ahk_id " hwnd)
+                    } else {
+                        ; For non-maximized windows, just move them
+                        WinMove(x + offsetX, y + offsetY, width, height, "ahk_id " hwnd)
+                    }
+                    
+                    Sleep(30) ; Short delay to prevent overwhelming the system
+                } catch Error as err {
+                    if (DEBUG_MODE)
+                        OutputDebug("ERROR moving window: " err.Message)
+                }
+            }
+            
+            if (DEBUG_MODE)
+                OutputDebug("Moved windows between monitors while preserving layout")
+        }
+        else {
+            ; === STANDARD WORKSPACE SWITCH (NO EXCHANGE) ===
+            if (DEBUG_MODE)
+                OutputDebug("Standard workspace switch - no exchange needed")
+
+            ; ====== STEP 1: Identify and minimize all windows on the active monitor ======
+            ; Get all open windows
+            windows := WinGetList() ; Gets a list of all open windows
+            if (DEBUG_MODE)
+                OutputDebug("Found " windows.Length " total windows")
+
+            ; Process each window
+            for index, hwnd in windows {
+                ; Skip invalid windows
+                if (!IsWindowValid(hwnd))
+                    continue
+
+                ; Check if window is on active monitor
+                windowMonitor := GetWindowMonitor(hwnd)
+                if (windowMonitor = activeMonitor) {
+                    ; Directly minimize the window on active monitor
+                    title := WinGetTitle(hwnd)
+                    if (DEBUG_MODE)
+                        OutputDebug("MINIMIZING window on active monitor: " title)
+
+                    ; Force the window to minimize
+                    try {
+                        WinMinimize("ahk_id " hwnd)
+                        Sleep(50) ; Delay to allow minimize operation to complete
+                    } catch Error as err {
+                        if (DEBUG_MODE)
+                            OutputDebug("ERROR minimizing window: " err.Message)
+                    }
+                }
+            }
+
+            ; ====== STEP 2: Change workspace ID for active monitor ======
+            ; Update the workspace ID for the active monitor
+            MonitorWorkspaces[activeMonitor] := requestedID
+            if (DEBUG_MODE)
+                OutputDebug("Changed active monitor workspace to: " requestedID)
+
+            ; Force a delay to allow minimizations to complete
+            Sleep(300)
+
+            ; ====== STEP 3: Restore windows belonging to requested workspace ======
+            restoreCount := 0
+
+            ; Get all windows again (in case things changed)
+            windows := WinGetList()
+
+            ; Process each window
+            for index, hwnd in windows {
+                ; Skip invalid windows
+                if (!IsWindowValid(hwnd))
+                    continue
+
+                ; Get window info
+                title := WinGetTitle(hwnd)
+                windowMonitor := GetWindowMonitor(hwnd)
+                winState := WinGetMinMax(hwnd)
+
+                ; Check if window is on active monitor
+                if (windowMonitor = activeMonitor) {
+                    ; This is a window that should be restored for the new workspace
+                    if (DEBUG_MODE)
+                        OutputDebug("RESTORING window for new workspace: " title)
+
+                    ; Force window restore - the WindowMoveResizeHandler will handle workspace assignment
+                    try {
+                        ; Restore from minimized state if needed
+                        if (winState = -1) {
+                            WinRestore("ahk_id " hwnd)
+                        }
+
+                        ; Note: WindowWorkspaces is now updated by event handlers, not directly here
+                        SaveWindowLayout(hwnd, requestedID)
+
+                        restoreCount++
+                        Sleep(30) ; Delay to allow restore operation to complete
+                    } catch Error as err {
+                        if (DEBUG_MODE)
+                            OutputDebug("ERROR restoring window: " err.Message)
+                    }
+                }
+            }
+
+            if (DEBUG_MODE)
+                OutputDebug("Restored " restoreCount " windows for workspace " requestedID)
         }
 
         if (DEBUG_MODE)
-            OutputDebug("Restored " restoreCount " windows for workspace " requestedID)
+            OutputDebug("------------- WORKSPACE SWITCH END -------------")
+
+        ; Update workspace overlays to reflect the new assignments
+        UpdateAllOverlays()
     }
-
-    if (DEBUG_MODE)
-        OutputDebug("------------- WORKSPACE SWITCH END -------------")
-
-    ; Update workspace overlays to reflect the new assignments
-    UpdateAllOverlays()
+    catch Error as err {
+        ; Log the error
+        if (DEBUG_MODE)
+            OutputDebug("ERROR during workspace switch: " err.Message)
+    }
+    finally {
+        ; Always clear the switch in progress flag, even if there was an error
+        SWITCH_IN_PROGRESS := False
+    }
 }
-
-; ----- Event Handlers -----
-
 ; Clean up stale window references to prevent memory leaks
 CleanupWindowReferences() {
     ; Clean up lastWindowState map if it exists in the WindowMoveResizeHandler function
@@ -714,6 +735,13 @@ CleanupWindowReferences() {
 }
 
 WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resize events to update saved layouts
+    ; Skip if switch is in progress to avoid recursive operations
+    if (SWITCH_IN_PROGRESS) {
+        if (DEBUG_MODE)
+            OutputDebug("Workspace switch in progress, ignoring window move/resize event")
+        return
+    }
+
     ; Skip invalid windows
     if (!IsWindowValid(hwnd))
         return
@@ -803,6 +831,13 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
 }
 
 NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events to assign new windows
+    ; Skip if switch is in progress to avoid recursive operations
+    if (SWITCH_IN_PROGRESS) {
+        if (DEBUG_MODE)
+            OutputDebug("Workspace switch in progress, ignoring new window event")
+        return
+    }
+
     ; First do an immediate check to see if the window is valid and what monitor it's on
     if (IsWindowValid(hwnd)) {
         try {
@@ -1077,6 +1112,10 @@ MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
 ; ===== DEBUG SETTINGS =====
 ; Set this to True to enable detailed logging for troubleshooting
 global DEBUG_MODE := False  ; Change to True to enable debugging
+
+; ===== STATE FLAGS =====
+; Flag to prevent recursive workspace switching and handler execution
+global SWITCH_IN_PROGRESS := False
 
 ; Monitor workspace assignments (monitor index → workspace ID)
 global MonitorWorkspaces := Map()

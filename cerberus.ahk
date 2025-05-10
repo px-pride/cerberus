@@ -796,21 +796,55 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                         title := WinGetTitle(hwnd)
                         LogMessage("Moving window from active to other monitor: " title)
                     }
-                    
+
                     ; Move window, preserving layout
                     if (isMaximized) {
                         ; First restore to normal, move, then maximize again
                         if (WinGetMinMax(hwnd) = 1)
                             WinRestore("ahk_id " hwnd)
-                        
+
                         ; Move to new position
                         WinMove(x - offsetX, y - offsetY, width, height, "ahk_id " hwnd)
-                        
+
+                        ; Verify the window was moved to the correct monitor
+                        Sleep(30) ; Allow time for the move operation to complete
+                        currMonitor := GetWindowMonitor(hwnd)
+
+                        if (currMonitor != otherMonitor) {
+                            ; Recalculate position in other monitor
+                            MonitorGetWorkArea(otherMonitor, &mLeft, &mTop, &mRight, &mBottom)
+                            centerX := mLeft + (mRight - mLeft - width) / 2
+                            centerY := mTop + (mBottom - mTop - height) / 2
+
+                            ; Force window to other monitor
+                            WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
+
+                            if (DEBUG_MODE)
+                                LogMessage("CORRECTED position to ensure window is on other monitor: " title)
+                        }
+
                         ; Maximize again
                         WinMaximize("ahk_id " hwnd)
                     } else {
                         ; For non-maximized windows, just move them
                         WinMove(x - offsetX, y - offsetY, width, height, "ahk_id " hwnd)
+
+                        ; Verify the window was moved to the correct monitor
+                        Sleep(30) ; Allow time for the move operation to complete
+                        currMonitor := GetWindowMonitor(hwnd)
+
+                        if (currMonitor != otherMonitor) {
+                            ; Recalculate position in other monitor
+                            MonitorGetWorkArea(otherMonitor, &mLeft, &mTop, &mRight, &mBottom)
+                            centerX := mLeft + (mRight - mLeft - width) / 2
+                            centerY := mTop + (mBottom - mTop - height) / 2
+
+                            ; Force window to other monitor
+                            WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
+
+                            if (DEBUG_MODE)
+                                LogMessage("CORRECTED position to ensure window is on other monitor: " title)
+                        }
                     }
                     
                     Sleep(30) ; Short delay to prevent overwhelming the system
@@ -831,21 +865,55 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                         title := WinGetTitle(hwnd)
                         LogMessage("Moving window from other to active monitor: " title)
                     }
-                    
+
                     ; Move window, preserving layout
                     if (isMaximized) {
                         ; First restore to normal, move, then maximize again
                         if (WinGetMinMax(hwnd) = 1)
                             WinRestore("ahk_id " hwnd)
-                        
+
                         ; Move to new position
                         WinMove(x + offsetX, y + offsetY, width, height, "ahk_id " hwnd)
-                        
+
+                        ; Verify the window was moved to the correct monitor
+                        Sleep(30) ; Allow time for the move operation to complete
+                        currMonitor := GetWindowMonitor(hwnd)
+
+                        if (currMonitor != activeMonitor) {
+                            ; Recalculate position in active monitor
+                            MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
+                            centerX := mLeft + (mRight - mLeft - width) / 2
+                            centerY := mTop + (mBottom - mTop - height) / 2
+
+                            ; Force window to active monitor
+                            WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
+
+                            if (DEBUG_MODE)
+                                LogMessage("CORRECTED position to ensure window is on active monitor: " title)
+                        }
+
                         ; Maximize again
                         WinMaximize("ahk_id " hwnd)
                     } else {
                         ; For non-maximized windows, just move them
                         WinMove(x + offsetX, y + offsetY, width, height, "ahk_id " hwnd)
+
+                        ; Verify the window was moved to the correct monitor
+                        Sleep(30) ; Allow time for the move operation to complete
+                        currMonitor := GetWindowMonitor(hwnd)
+
+                        if (currMonitor != activeMonitor) {
+                            ; Recalculate position in active monitor
+                            MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
+                            centerX := mLeft + (mRight - mLeft - width) / 2
+                            centerY := mTop + (mBottom - mTop - height) / 2
+
+                            ; Force window to active monitor
+                            WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
+
+                            if (DEBUG_MODE)
+                                LogMessage("CORRECTED position to ensure window is on active monitor: " title)
+                        }
                     }
                     
                     Sleep(30) ; Short delay to prevent overwhelming the system
@@ -959,13 +1027,44 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                         ; Restore from minimized state if needed
                         if (winState = -1) {
                             WinRestore("ahk_id " hwnd)
+                            Sleep(30) ; Allow time for the restore operation to complete
+                        }
+
+                        ; Verify window is on the correct monitor even if it was already restored
+                        try {
+                            ; Get current window position after restore
+                            WinGetPos(&currX, &currY, &currWidth, &currHeight, "ahk_id " hwnd)
+
+                            ; Get current window monitor
+                            currMonitor := GetWindowMonitor(hwnd)
+
+                            ; Check if window needs to be moved to the active monitor
+                            if (currMonitor != activeMonitor) {
+                                ; Get active monitor dimensions
+                                MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
+
+                                ; Calculate new position to center window on active monitor
+                                newX := mLeft + (mRight - mLeft - currWidth) / 2
+                                newY := mTop + (mBottom - mTop - currHeight) / 2
+
+                                ; Move window to active monitor
+                                WinMove(newX, newY, currWidth, currHeight, "ahk_id " hwnd)
+
+                                if (DEBUG_MODE)
+                                    LogMessage("MOVED restored window to active monitor: " title)
+
+                                Sleep(30) ; Allow time for the move operation to complete
+                            }
+                        } catch Error as moveErr {
+                            if (DEBUG_MODE)
+                                LogMessage("ERROR moving window to correct monitor: " moveErr.Message)
                         }
 
                         ; Note: WindowWorkspaces is now updated by event handlers, not directly here
                         SaveWindowLayout(hwnd, requestedID)
 
                         restoreCount++
-                        Sleep(30) ; Delay to allow restore operation to complete
+                        Sleep(30) ; Delay to allow operations to complete
                     } catch Error as err {
                         if (DEBUG_MODE)
                             LogMessage("ERROR restoring window: " err.Message)

@@ -756,17 +756,25 @@ CleanupWindowReferences() {
     
     ; Clean up WindowWorkspaces map
     workspaceStaleCount := 0
+    updated := false
     for hwnd, workspaceID in WindowWorkspaces {
         try {
             if !WinExist(hwnd) {
                 WindowWorkspaces.Delete(hwnd)
                 workspaceStaleCount++
+                updated := true
             }
         } catch Error as err {
             ; If there's an error, remove this reference anyway
             WindowWorkspaces.Delete(hwnd)
             workspaceStaleCount++
+            updated := true
         }
+    }
+
+    ; If any windows were removed and the count is significant, update the overlay
+    if (workspaceStaleCount > 0) {
+        UpdateWorkspaceWindowOverlay() ; Update overlay if visible
     }
     
     ; Clean up WorkspaceLayouts map
@@ -829,6 +837,7 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
             if (workspaceID = activeWorkspaceID) {
                 WindowWorkspaces[hwnd] := 0
                 LogMessage("Window minimized and removed from active workspace: " title)
+                UpdateWorkspaceWindowOverlay() ; Update overlay if visible
             }
         }
         return
@@ -859,6 +868,7 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
             if (prevWorkspaceID != newWorkspaceID) {
                 WindowWorkspaces[hwnd] := newWorkspaceID
                 LogMessage("Window un-minimized, reassigned from workspace " prevWorkspaceID " to " newWorkspaceID ": " title)
+                UpdateWorkspaceWindowOverlay() ; Update overlay if visible
             }
         }
     }
@@ -882,6 +892,7 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
                 if (currentWindowWorkspace != currentMonitorWorkspace && currentWindowWorkspace != 0) {
                     WindowWorkspaces[hwnd] := currentMonitorWorkspace
                     LogMessage("Window moved/resized, reassigned from workspace " currentWindowWorkspace " to " currentMonitorWorkspace ": " title)
+                    UpdateWorkspaceWindowOverlay() ; Update overlay if visible
                 }
             }
         }
@@ -921,6 +932,7 @@ NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events t
 
                     ; Assign to workspace of monitor it appears on
                     WindowWorkspaces[hwnd] := workspaceID
+                    UpdateWorkspaceWindowOverlay() ; Update overlay if visible
 
                     if (DEBUG_MODE)
                         LogMessage("New window immediately assigned to workspace " workspaceID " on monitor " monitorIndex ": " title)
@@ -1000,6 +1012,7 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
                 ; Window was not assigned in initial handler - assign it now
                 WindowWorkspaces[hwnd] := workspaceID ; Assigns window to workspace
                 SaveWindowLayout(hwnd, workspaceID) ; Saves window layout
+                UpdateWorkspaceWindowOverlay() ; Update overlay if visible
                 if (DEBUG_MODE)
                     LogMessage("Window assigned in delayed check to workspace " workspaceID " on monitor " monitorIndex)
 
@@ -1023,6 +1036,7 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
                 if (currentWorkspaceID != workspaceID) {
                     WindowWorkspaces[hwnd] := workspaceID
                     SaveWindowLayout(hwnd, workspaceID)
+                    UpdateWorkspaceWindowOverlay() ; Update overlay if visible
                     if (DEBUG_MODE)
                         LogMessage("Updated window workspace from " currentWorkspaceID " to " workspaceID " (delayed check)")
 
@@ -1043,6 +1057,7 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
         ; Default to unassigned if monitor has no workspace
         try {
             WindowWorkspaces[hwnd] := 0
+            UpdateWorkspaceWindowOverlay() ; Update overlay if visible
             if (DEBUG_MODE)
                 LogMessage("Assigned window to unassigned workspace (0) - monitor not tracked (delayed check)")
         } catch Error as err {
@@ -1246,15 +1261,36 @@ ToggleOverlays() { ; Toggles visibility of workspace indicators
 
 ; Function to show/hide an overlay with a list of windows in each workspace
 ShowWorkspaceWindowList() {
-    static windowListOverlay := ""
-    static isVisible := false
+    ; Toggle the overlay visibility
+    if (WindowListVisible && WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
+        HideWorkspaceWindowList()
+    } else {
+        ShowWorkspaceWindowOverlay()
+    }
+}
 
-    ; If the overlay is already visible, hide it
-    if (isVisible && windowListOverlay && WinExist("ahk_id " windowListOverlay.Hwnd)) {
-        windowListOverlay.Destroy()
-        windowListOverlay := ""
-        isVisible := false
-        return
+; Function to hide the workspace window overlay
+HideWorkspaceWindowList() {
+    if (WindowListVisible && WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
+        WindowListOverlay.Destroy()
+        WindowListOverlay := ""
+        WindowListVisible := false
+    }
+}
+
+; Function to update the workspace window overlay if it's visible
+UpdateWorkspaceWindowOverlay() {
+    ; If the workspace window overlay is visible, update it
+    if (WindowListVisible && WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
+        ShowWorkspaceWindowOverlay() ; This will recreate the overlay with updated information
+    }
+}
+
+; Function to show or update the workspace window overlay
+ShowWorkspaceWindowOverlay() {
+    ; First destroy any existing overlay
+    if (WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
+        WindowListOverlay.Destroy()
     }
 
     ; Get current window information for all workspaces
@@ -1279,9 +1315,9 @@ ShowWorkspaceWindowList() {
     windowList := BuildWorkspaceWindowText(windowsByWorkspace)
     textCtrl := listGui.Add("Text", "x10 y10 w" guiWidth-20 " h" guiHeight-20 " c33FFFF", windowList)
 
-    ; Store GUI reference in static variable
-    windowListOverlay := listGui
-    isVisible := true
+    ; Store GUI reference in global variable
+    WindowListOverlay := listGui
+    WindowListVisible := true
 
     ; Show the GUI as an overlay
     listGui.Show("x" xPos " y" yPos " w" guiWidth " h" guiHeight " NoActivate")
@@ -1373,6 +1409,9 @@ global WindowWorkspaces := Map()
 global WorkspaceLayouts := Map()
 ; Workspace overlay GUI handles (monitor index → GUI handle)
 global WorkspaceOverlays := Map()
+; Workspace window list overlay
+global WindowListOverlay := ""
+global WindowListVisible := false
 ; Overlay display settings
 global OVERLAY_SIZE := 60 ; Size of overlay in pixels (increased for better visibility)
 global OVERLAY_MARGIN := 20 ; Margin from screen edge

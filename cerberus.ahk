@@ -481,6 +481,111 @@ DelayedWindowCheck(hwnd, *) {
         LogMessage("Error in delayed window assignment timer: " err.Message)
     }
 }
+SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified workspace
+    ; Reference global variables
+    global SWITCH_IN_PROGRESS, DEBUG_MODE, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
+
+    ; Early exit conditions
+    if (targetWorkspaceID < 1 || targetWorkspaceID > MAX_WORKSPACES)
+        return
+
+    ; Check if another switch operation is already in progress
+    if (SWITCH_IN_PROGRESS) {
+        if (DEBUG_MODE)
+            LogMessage("Another workspace operation in progress, ignoring send window request")
+        return
+    }
+
+    ; Set the flag to indicate operation is in progress
+    SWITCH_IN_PROGRESS := True
+
+    try {
+        ; Log the start of window movement
+        if (DEBUG_MODE)
+            LogMessage("------------- SEND WINDOW TO WORKSPACE START -------------")
+
+        ; Get active window
+        activeHwnd := WinExist("A")
+        if (!activeHwnd || !IsWindowValid(activeHwnd)) {
+            if (DEBUG_MODE)
+                LogMessage("No valid active window to move")
+            SWITCH_IN_PROGRESS := False
+            return
+        }
+
+        ; Get window title for logging
+        title := WinGetTitle(activeHwnd)
+        if (DEBUG_MODE)
+            LogMessage("Sending window '" title "' to workspace " targetWorkspaceID)
+
+        ; Update window workspace assignment
+        prevWorkspaceID := WindowWorkspaces.Has(activeHwnd) ? WindowWorkspaces[activeHwnd] : 0
+        WindowWorkspaces[activeHwnd] := targetWorkspaceID
+
+        ; Check if target workspace is visible on any monitor
+        targetMonitor := 0
+        for monIndex, workspaceID in MonitorWorkspaces {
+            if (workspaceID = targetWorkspaceID) {
+                targetMonitor := monIndex
+                break
+            }
+        }
+
+        if (targetMonitor > 0) {
+            ; Target workspace is visible - move window to that monitor
+            if (DEBUG_MODE)
+                LogMessage("Target workspace " targetWorkspaceID " is visible on monitor " targetMonitor)
+
+            ; Get target monitor dimensions
+            MonitorGetWorkArea(targetMonitor, &mLeft, &mTop, &mRight, &mBottom)
+
+            ; Get current window position and size
+            WinGetPos(&x, &y, &width, &height, activeHwnd)
+
+            ; Calculate new position to center window on target monitor
+            newX := mLeft + (mRight - mLeft - width) / 2
+            newY := mTop + (mBottom - mTop - height) / 2
+
+            ; Move the window to target monitor
+            WinMove(newX, newY, width, height, "ahk_id " activeHwnd)
+
+            ; Save the new layout
+            SaveWindowLayout(activeHwnd, targetWorkspaceID)
+
+            ; Activate the window to bring it to front
+            WinActivate("ahk_id " activeHwnd)
+
+            if (DEBUG_MODE)
+                LogMessage("Moved window to monitor " targetMonitor " with workspace " targetWorkspaceID)
+        } else {
+            ; Target workspace not visible on any monitor - minimize the window
+            if (DEBUG_MODE)
+                LogMessage("Target workspace " targetWorkspaceID " is not visible - minimizing window")
+
+            ; Minimize the window
+            WinMinimize("ahk_id " activeHwnd)
+
+            ; Save window layout for future restoration
+            SaveWindowLayout(activeHwnd, targetWorkspaceID)
+        }
+
+        ; Update workspace window overlay if it's visible
+        UpdateWorkspaceWindowOverlay()
+
+        if (DEBUG_MODE)
+            LogMessage("Window successfully assigned to workspace " targetWorkspaceID)
+
+        if (DEBUG_MODE)
+            LogMessage("------------- SEND WINDOW TO WORKSPACE END -------------")
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("ERROR in SendWindowToWorkspace: " err.Message)
+    } finally {
+        ; Always clear the switch in progress flag
+        SWITCH_IN_PROGRESS := False
+    }
+}
+
 SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     ; Reference global variables
     global SWITCH_IN_PROGRESS, DEBUG_MODE, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
@@ -1804,6 +1909,7 @@ global LAST_ACTIVE_MONITOR := 0 ; Tracks the last known active monitor
 MsgBox("Cerberus Workspace Manager starting..."
       "`nPress OK to continue"
       "`nPress Ctrl+1 through Ctrl+9 to switch workspaces"
+      "`nPress Ctrl+Shift+1 through Ctrl+Shift+9 to send active window to workspace"
       "`nPress Ctrl+0 to toggle workspace number overlays and monitor border"
       "`nPress Ctrl+` to toggle window assignments overlay"
       "`nActive monitor (based on mouse position) is highlighted with a border", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
@@ -1841,6 +1947,18 @@ CheckMouseMovement(*) {
 ^7::SwitchToWorkspace(7) ; Ctrl+7 hotkey to switch to workspace 7
 ^8::SwitchToWorkspace(8) ; Ctrl+8 hotkey to switch to workspace 8
 ^9::SwitchToWorkspace(9) ; Ctrl+9 hotkey to switch to workspace 9
+
+; Ctrl+Shift+1 through Ctrl+Shift+9 for sending active window to workspaces
+^+1::SendWindowToWorkspace(1) ; Ctrl+Shift+1 hotkey to send active window to workspace 1
+^+2::SendWindowToWorkspace(2) ; Ctrl+Shift+2 hotkey to send active window to workspace 2
+^+3::SendWindowToWorkspace(3) ; Ctrl+Shift+3 hotkey to send active window to workspace 3
+^+4::SendWindowToWorkspace(4) ; Ctrl+Shift+4 hotkey to send active window to workspace 4
+^+5::SendWindowToWorkspace(5) ; Ctrl+Shift+5 hotkey to send active window to workspace 5
+^+6::SendWindowToWorkspace(6) ; Ctrl+Shift+6 hotkey to send active window to workspace 6
+^+7::SendWindowToWorkspace(7) ; Ctrl+Shift+7 hotkey to send active window to workspace 7
+^+8::SendWindowToWorkspace(8) ; Ctrl+Shift+8 hotkey to send active window to workspace 8
+^+9::SendWindowToWorkspace(9) ; Ctrl+Shift+9 hotkey to send active window to workspace 9
+
 ; Ctrl+0 to toggle workspace overlays and monitor border
 ^0::ToggleBordersAndOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays and monitor border
 ; Ctrl+` to toggle window workspace information overlay

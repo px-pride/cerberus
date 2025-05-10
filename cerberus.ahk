@@ -534,6 +534,9 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                 LogMessage("Swapping workspace IDs: " currentWorkspaceID " and " requestedID)
             MonitorWorkspaces[otherMonitor] := currentWorkspaceID
             MonitorWorkspaces[activeMonitor] := requestedID
+
+            ; Update overlays immediately after changing workspace IDs
+            UpdateAllOverlays()
             
             ; Step 2: Move windows from active monitor to other monitor
             for index, hwnd in activeMonitorWindows {
@@ -650,6 +653,9 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
             if (DEBUG_MODE)
                 LogMessage("Changed active monitor workspace to: " requestedID)
 
+            ; Update overlays immediately after changing workspace ID
+            UpdateAllOverlays()
+
             ; Force a delay to allow minimizations to complete
             Sleep(300)
 
@@ -701,9 +707,6 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
 
         if (DEBUG_MODE)
             LogMessage("------------- WORKSPACE SWITCH END -------------")
-
-        ; Update workspace overlays to reflect the new assignments
-        UpdateAllOverlays()
     }
     catch Error as err {
         ; Log the error
@@ -713,6 +716,10 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     finally {
         ; Always clear the switch in progress flag, even if there was an error
         SWITCH_IN_PROGRESS := False
+
+        ; Always update overlays to ensure they reflect the current workspace state,
+        ; even if there was an error or early return in the switch logic
+        UpdateAllOverlays()
     }
 }
 ; Clean up stale window references to prevent memory leaks

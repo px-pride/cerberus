@@ -819,9 +819,18 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
     if (!IsWindowValid(hwnd))
         return
 
+    ; Get window info for logging
+    title := WinGetTitle(hwnd)
+    class := WinGetClass(hwnd)
+
+    ; Log the event type - this helps track all window activity
+    if (DEBUG_MODE) {
+        eventType := (msg = 0x0003) ? "MOVED" : "RESIZED"
+        LogMessage("WINDOW " eventType ": " title " (hwnd: " hwnd ", class: " class ")")
+    }
+
     ; Get window state
     winState := WinGetMinMax(hwnd)
-    title := WinGetTitle(hwnd)
 
     ; Check if window is minimized
     if (winState = -1) { ; Window is minimized
@@ -917,6 +926,18 @@ NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events t
         return
     }
 
+    ; Get window info for initial logging - even if it's not valid
+    try {
+        title := WinGetTitle(hwnd)
+        class := WinGetClass(hwnd)
+
+        if (DEBUG_MODE)
+            LogMessage("NEW WINDOW CREATED: " title " (hwnd: " hwnd ", class: " class ")")
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("NEW WINDOW CREATED: Unable to get details (hwnd: " hwnd ")")
+    }
+
     ; First do an immediate check to see if the window is valid and what monitor it's on
     if (IsWindowValid(hwnd)) {
         try {
@@ -969,6 +990,35 @@ NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events t
     SetTimer(DelayedWindowCheck.Bind(local_hwnd), -1000)
 
     ; The DelayedWindowCheck function will be defined separately to handle the check
+}
+
+; Handler for window close events
+WindowCloseHandler(wParam, lParam, msg, hwnd) {
+    ; Reference global variables
+    global WindowWorkspaces, DEBUG_MODE
+
+    ; Skip if the window is not being tracked
+    if (!WindowWorkspaces.Has(hwnd))
+        return
+
+    ; Get window info for logging before it's gone
+    try {
+        title := WinGetTitle(hwnd)
+        workspaceID := WindowWorkspaces[hwnd]
+
+        if (DEBUG_MODE)
+            LogMessage("WINDOW CLOSED: " title " (hwnd: " hwnd "), previously in workspace " workspaceID)
+    } catch Error as err {
+        ; Window may already be gone by this point, which is fine
+        if (DEBUG_MODE)
+            LogMessage("Window closing - could not get title - hwnd: " hwnd)
+    }
+
+    ; Remove the window from tracking
+    WindowWorkspaces.Delete(hwnd)
+
+    ; Update the workspace window overlay if it's visible
+    UpdateWorkspaceWindowOverlay()
 }
 
 AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed follow-up check)
@@ -1158,6 +1208,10 @@ GetWorkspaceWindowInfo() {
             }
         }
         LogMessage("Total windows counted: " totalWindows)
+
+        ; Log how many windows are in the WindowWorkspaces map
+        trackedCount := WindowWorkspaces.Count
+        LogMessage("WindowWorkspaces map contains " trackedCount " windows")
     }
 
     return windowsByWorkspace
@@ -1558,3 +1612,5 @@ OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE - Registers a handler for 
 ; Track new window events to assign to current workspace
 ; This event provides an hwnd when a window is created
 OnMessage(0x0001, NewWindowHandler)  ; WM_CREATE - Registers a handler for window creation events
+; Track window close events to remove windows from tracking
+OnMessage(0x0002, WindowCloseHandler)  ; WM_DESTROY - Registers a handler for window destruction events

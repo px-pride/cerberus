@@ -1246,13 +1246,13 @@ ToggleOverlays() { ; Toggles visibility of workspace indicators
 
 ; Function to show/hide an overlay with a list of windows in each workspace
 ShowWorkspaceWindowList() {
-    static windowListGui := ""
+    static windowListOverlay := ""
     static isVisible := false
 
-    ; If the window is already open, close it
-    if (isVisible && windowListGui && WinExist("ahk_id " windowListGui.Hwnd)) {
-        windowListGui.Destroy()
-        windowListGui := ""
+    ; If the overlay is already visible, hide it
+    if (isVisible && windowListOverlay && WinExist("ahk_id " windowListOverlay.Hwnd)) {
+        windowListOverlay.Destroy()
+        windowListOverlay := ""
         isVisible := false
         return
     }
@@ -1260,85 +1260,94 @@ ShowWorkspaceWindowList() {
     ; Get current window information for all workspaces
     windowsByWorkspace := GetWorkspaceWindowInfo()
 
-    ; Create a new GUI for the workspace window list
-    listGui := Gui("+AlwaysOnTop +ToolWindow +Owner")
-    listGui.Title := "Workspace Windows"
-    listGui.SetFont("s10", "Segoe UI")
-    listGui.BackColor := "1E1E1E" ; Dark background
+    ; Create a new GUI for the workspace window list overlay
+    listGui := Gui("+AlwaysOnTop -Caption +ToolWindow +Owner")
+    listGui.BackColor := "000000" ; Black background for overlay
 
-    ; Set a reasonable size for the GUI
-    guiWidth := 600
-    guiHeight := 600
+    ; Set overlay size - make it cover most of the screen but not all
+    screenWidth := A_ScreenWidth
+    screenHeight := A_ScreenHeight
+    guiWidth := screenWidth * 0.8
+    guiHeight := screenHeight * 0.8
 
-    ; Add a ListView to display the workspace information
-    lv := listGui.Add("ListView", "Grid NoSortHdr -Multi w" guiWidth " h" guiHeight, ["Workspace", "Window Title"])
-    lv.Opt("Background121212 cWhite")
-    lv.SetFont("s10", "Segoe UI")
+    ; Calculate position to center on screen
+    xPos := (screenWidth - guiWidth) / 2
+    yPos := (screenHeight - guiHeight) / 2
 
-    ; Set list view column widths - use the more modern way to modify columns
-    lv.ModifyCol(1, 100)
-    lv.ModifyCol(2, 450)
+    ; Add a text control to display the window list
+    listGui.SetFont("s12", "Consolas")
+    windowList := BuildWorkspaceWindowText(windowsByWorkspace)
+    textCtrl := listGui.Add("Text", "x10 y10 w" guiWidth-20 " h" guiHeight-20 " c33FFFF", windowList)
 
-    ; Add rows to the ListView, organized by workspace
+    ; Store GUI reference in static variable
+    windowListOverlay := listGui
+    isVisible := true
+
+    ; Show the GUI as an overlay
+    listGui.Show("x" xPos " y" yPos " w" guiWidth " h" guiHeight " NoActivate")
+
+    ; Make it semi-transparent
+    WinSetTransparent(180, "ahk_id " listGui.Hwnd)
+
+    return listGui
+}
+
+; Helper function to build the text display for workspace windows
+BuildWorkspaceWindowText(windowsByWorkspace) {
+    text := "==========================================`n"
+    text .= "           WORKSPACE WINDOWS`n"
+    text .= "==========================================`n`n"
+
     totalWindows := 0
 
-    ; Start with workspace 1-9
+    ; Add windows from each workspace
     loop MAX_WORKSPACES {
         workspaceID := A_Index
         windows := windowsByWorkspace[workspaceID]
 
-        ; If this workspace has windows, add them to the list
+        ; If this workspace has windows, add them to the text
         if (windows.Length > 0) {
-            ; Add a workspace header
-            lv.Add("", "Workspace " workspaceID, "")
+            text .= "WORKSPACE " workspaceID " (" windows.Length " windows):`n"
+            text .= "------------------------------------------`n"
 
             ; Add each window in this workspace
             for index, window in windows {
-                truncatedTitle := SubStr(window.title, 1, 70) ; Truncate long titles
-                if (StrLen(window.title) > 70)
+                truncatedTitle := SubStr(window.title, 1, 60) ; Truncate long titles
+                if (StrLen(window.title) > 60)
                     truncatedTitle .= "..."
 
-                lv.Add("", "", truncatedTitle)
+                text .= "  • " truncatedTitle "`n"
                 totalWindows++
             }
 
-            ; Add a separator row after each workspace group
-            lv.Add("", "", "")
+            text .= "`n"
         }
     }
 
     ; Add unassigned windows (workspace 0) at the end if there are any
     unassignedWindows := windowsByWorkspace[0]
     if (unassignedWindows.Length > 0) {
-        lv.Add("", "Unassigned", "")
+        text .= "UNASSIGNED (" unassignedWindows.Length " windows):`n"
+        text .= "------------------------------------------`n"
 
         for index, window in unassignedWindows {
-            truncatedTitle := SubStr(window.title, 1, 70) ; Truncate long titles
-            if (StrLen(window.title) > 70)
+            truncatedTitle := SubStr(window.title, 1, 60) ; Truncate long titles
+            if (StrLen(window.title) > 60)
                 truncatedTitle .= "..."
 
-            lv.Add("", "", truncatedTitle)
+            text .= "  • " truncatedTitle "`n"
             totalWindows++
         }
+
+        text .= "`n"
     }
 
-    ; Update the title with window count
-    listGui.Title := "Workspace Windows - " totalWindows " windows"
+    text .= "==========================================`n"
+    text .= "Total: " totalWindows " windows across " MAX_WORKSPACES " workspaces`n"
+    text .= "Press Ctrl+` again to close this overlay`n"
+    text .= "==========================================`n"
 
-    ; Center the GUI on screen
-    screenWidth := A_ScreenWidth
-    screenHeight := A_ScreenHeight
-    xPos := (screenWidth - guiWidth) / 2
-    yPos := (screenHeight - guiHeight) / 2
-
-    ; Store GUI reference in static variable and show it
-    windowListGui := listGui
-    isVisible := true
-
-    ; Show the GUI
-    listGui.Show("x" xPos " y" yPos " w" guiWidth " h" guiHeight)
-
-    return listGui
+    return text
 }
 
 ; ====== Configuration ======
@@ -1376,8 +1385,8 @@ global OVERLAY_POSITION := "BottomRight" ; TopLeft, TopRight, BottomLeft, Bottom
 MsgBox("Cerberus Workspace Manager starting..."
       "`nPress OK to continue"
       "`nPress Ctrl+1 through Ctrl+9 to switch workspaces"
-      "`nPress Ctrl+0 to toggle overlays"
-      "`nPress Ctrl+` to toggle window assignments", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
+      "`nPress Ctrl+0 to toggle workspace number overlays"
+      "`nPress Ctrl+` to toggle window assignments overlay", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
 
 CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
 SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations
@@ -1403,8 +1412,8 @@ SetTimer(CleanupWindowReferences, 120000)
 ^9::SwitchToWorkspace(9) ; Ctrl+9 hotkey to switch to workspace 9
 ; Ctrl+0 to toggle workspace overlays
 ^0::ToggleOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays
-; Ctrl+` to toggle window workspace information display
-^`::ShowWorkspaceWindowList() ; Ctrl+` hotkey to toggle a list of windows in each workspace
+; Ctrl+` to toggle window workspace information overlay
+^`::ShowWorkspaceWindowList() ; Ctrl+` hotkey to toggle overlay showing windows in each workspace
 
 ; ====== Register Event Handlers ======
 ; Track window move/resize events to update layouts

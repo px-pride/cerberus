@@ -720,6 +720,9 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
         ; Always update overlays to ensure they reflect the current workspace state,
         ; even if there was an error or early return in the switch logic
         UpdateAllOverlays()
+
+        ; Also update the workspace window overlay if it's visible
+        UpdateWorkspaceWindowOverlay()
     }
 }
 ; Clean up stale window references to prevent memory leaks
@@ -1272,22 +1275,39 @@ ShowWorkspaceWindowList() {
 ; Function to hide the workspace window overlay
 HideWorkspaceWindowList() {
     ; Reference global variables
-    global WindowListVisible, WindowListOverlay
+    global WindowListVisible, WindowListOverlay, DEBUG_MODE
 
     if (WindowListVisible && WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
+        ; Stop the update timer
+        SetTimer(PeriodicOverlayUpdate, 0) ; Disable the timer
+
+        ; Destroy the overlay
         WindowListOverlay.Destroy()
         WindowListOverlay := ""
         WindowListVisible := false
+
+        if (DEBUG_MODE)
+            LogMessage("Workspace window overlay hidden")
     }
+}
+
+; Function for periodic updates of the workspace window overlay
+PeriodicOverlayUpdate(*) {
+    ; Refresh the workspace window list if visible
+    UpdateWorkspaceWindowOverlay()
 }
 
 ; Function to update the workspace window overlay if it's visible
 UpdateWorkspaceWindowOverlay() {
     ; Reference global variables
-    global WindowListVisible, WindowListOverlay
+    global WindowListVisible, WindowListOverlay, DEBUG_MODE
 
     ; If the workspace window overlay is visible, update it
     if (WindowListVisible && WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
+        if (DEBUG_MODE)
+            LogMessage("Updating workspace window overlay due to window changes")
+
+        ; Force a refresh by destroying the current overlay and creating a new one
         ShowWorkspaceWindowOverlay() ; This will recreate the overlay with updated information
     }
 }
@@ -1333,6 +1353,12 @@ ShowWorkspaceWindowOverlay() {
 
     ; Make it semi-transparent (higher value = less transparent)
     WinSetTransparent(225, "ahk_id " listGui.Hwnd)
+
+    ; Set up a timer for periodic updates (every 2 seconds)
+    SetTimer(PeriodicOverlayUpdate, 2000)
+
+    if (DEBUG_MODE)
+        LogMessage("Workspace window overlay created/updated")
 
     return listGui
 }

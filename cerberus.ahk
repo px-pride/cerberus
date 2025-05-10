@@ -1237,8 +1237,19 @@ ToggleOverlays() { ; Toggles visibility of workspace indicators
     isVisible := !isVisible
 }
 
-; Function to show an overlay with a list of windows in each workspace
+; Function to show/hide an overlay with a list of windows in each workspace
 ShowWorkspaceWindowList() {
+    static windowListGui := ""
+    static isVisible := false
+
+    ; If the window is already open, close it
+    if (isVisible && windowListGui && WinExist("ahk_id " windowListGui.Hwnd)) {
+        windowListGui.Destroy()
+        windowListGui := ""
+        isVisible := false
+        return
+    }
+
     ; Get current window information for all workspaces
     windowsByWorkspace := GetWorkspaceWindowInfo()
 
@@ -1313,12 +1324,12 @@ ShowWorkspaceWindowList() {
     xPos := (screenWidth - guiWidth) / 2
     yPos := (screenHeight - guiHeight) / 2
 
+    ; Store GUI reference in static variable and show it
+    windowListGui := listGui
+    isVisible := true
+
     ; Show the GUI
     listGui.Show("x" xPos " y" yPos " w" guiWidth " h" guiHeight)
-
-    ; Set a timer to automatically close the overlay after a period
-    closeTimeout := 10000 ; 10 seconds
-    SetTimer(() => listGui.Destroy(), -closeTimeout)
 
     return listGui
 }
@@ -1359,7 +1370,7 @@ MsgBox("Cerberus Workspace Manager starting..."
       "`nPress OK to continue"
       "`nPress Ctrl+1 through Ctrl+9 to switch workspaces"
       "`nPress Ctrl+0 to toggle overlays"
-      "`nPress Ctrl+` to show window assignments", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
+      "`nPress Ctrl+` to toggle window assignments", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
 
 CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
 SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations
@@ -1385,8 +1396,8 @@ SetTimer(CleanupWindowReferences, 120000)
 ^9::SwitchToWorkspace(9) ; Ctrl+9 hotkey to switch to workspace 9
 ; Ctrl+0 to toggle workspace overlays
 ^0::ToggleOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays
-; Ctrl+` to show window workspace assignments
-^`::ShowWorkspaceWindowList() ; Ctrl+` hotkey to show a list of windows in each workspace
+; Ctrl+` to toggle window workspace information display
+^`::ShowWorkspaceWindowList() ; Ctrl+` hotkey to toggle a list of windows in each workspace
 
 ; ====== Register Event Handlers ======
 ; Track window move/resize events to update layouts

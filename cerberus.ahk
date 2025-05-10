@@ -1286,8 +1286,8 @@ ShowWorkspaceWindowList() {
     ; Show the GUI as an overlay
     listGui.Show("x" xPos " y" yPos " w" guiWidth " h" guiHeight " NoActivate")
 
-    ; Make it semi-transparent
-    WinSetTransparent(180, "ahk_id " listGui.Hwnd)
+    ; Make it semi-transparent (higher value = less transparent)
+    WinSetTransparent(225, "ahk_id " listGui.Hwnd)
 
     return listGui
 }

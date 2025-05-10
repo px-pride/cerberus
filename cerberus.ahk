@@ -397,7 +397,7 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
 
 ; Function to log messages either to file or debug output
 LogMessage(message) {
-    global DEBUG_MODE, LOG_TO_FILE, LOG_FILE
+    global DEBUG_MODE, LOG_TO_FILE, LOG_FILE, SHOW_WINDOW_EVENT_TOOLTIPS, SHOW_TRAY_NOTIFICATIONS
 
     ; Only log if debugging is enabled
     if (!DEBUG_MODE)
@@ -419,6 +419,40 @@ LogMessage(message) {
     } else {
         ; Send to debug output
         OutputDebug(logMessage)
+
+        ; Check for window events (move, resize, create, close)
+        isWindowEvent := (InStr(message, "WINDOW MOVED:") || InStr(message, "WINDOW RESIZED:") ||
+                         InStr(message, "WINDOW CLOSED:") || InStr(message, "NEW WINDOW CREATED:"))
+
+        ; Show tooltip for window events if enabled
+        if (SHOW_WINDOW_EVENT_TOOLTIPS && isWindowEvent) {
+            ; Display a temporary tooltip at cursor position
+            MouseGetPos(&xpos, &ypos)
+            ToolTip(message, xpos+10, ypos+10)
+
+            ; Auto-hide tooltip after a short delay
+            SetTimer(() => ToolTip(), -2000) ; Clear tooltip after 2 seconds
+        }
+
+        ; Show tray notifications for window events if enabled
+        if (SHOW_TRAY_NOTIFICATIONS && isWindowEvent) {
+            ; Extract just the event part for the notification
+            eventTitle := ""
+            if (InStr(message, "WINDOW MOVED:"))
+                eventTitle := "Window Moved"
+            else if (InStr(message, "WINDOW RESIZED:"))
+                eventTitle := "Window Resized"
+            else if (InStr(message, "WINDOW CLOSED:"))
+                eventTitle := "Window Closed"
+            else if (InStr(message, "NEW WINDOW CREATED:"))
+                eventTitle := "New Window"
+
+            ; Show notification
+            TrayTip(eventTitle, message)
+
+            ; Auto-hide the tray notification after a short delay
+            SetTimer(() => TrayTip(), -3000) ; Clear tray notification after 3 seconds
+        }
     }
 }
 
@@ -1547,6 +1581,8 @@ MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
 global DEBUG_MODE := True  ; Change to True to enable debugging
 global LOG_TO_FILE := False  ; Set to True to log to file instead of Debug output
 global LOG_FILE := A_ScriptDir "\cerberus.log"  ; Path to log file
+global SHOW_WINDOW_EVENT_TOOLTIPS := True  ; Set to True to show tooltips for window events
+global SHOW_TRAY_NOTIFICATIONS := False  ; Set to True to show tray notifications for window events
 
 ; ===== STATE FLAGS =====
 ; Flag to prevent recursive workspace switching and handler execution

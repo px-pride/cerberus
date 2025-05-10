@@ -215,17 +215,28 @@ GetWindowMonitor(hwnd) { ; Determines which monitor contains the window
     return 1
 }
 
-GetActiveMonitor() { ; Gets the monitor index where the active window is located
+GetActiveMonitor() { ; Gets the monitor index where the mouse cursor is located
     ; Reference global variables
     global DEBUG_MODE
 
     try {
-        ; Get active window
-        activeHwnd := WinExist("A") ; Gets handle of active window
-        if !activeHwnd
-            return 1  ; Default to primary monitor
+        ; Get mouse cursor position
+        MouseGetPos(&mouseX, &mouseY)
 
-        return GetWindowMonitor(activeHwnd) ; Gets monitor index for active window
+        if (DEBUG_MODE)
+            LogMessage("Getting active monitor for mouse position: " mouseX ", " mouseY)
+
+        ; Find which monitor contains the mouse cursor
+        monitorCount := MonitorGetCount()
+
+        loop monitorCount {
+            MonitorGetWorkArea(A_Index, &mLeft, &mTop, &mRight, &mBottom)
+            if (mouseX >= mLeft && mouseX <= mRight && mouseY >= mTop && mouseY <= mBottom)
+                return A_Index
+        }
+
+        ; If no monitor was found (should not happen normally), default to primary
+        return 1
     } catch Error as err {
         if (DEBUG_MODE)
             LogMessage("Error in GetActiveMonitor: " err.Message)
@@ -1153,9 +1164,9 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
 
 ; ----- Overlay Functions -----
 
-InitializeOverlays() { ; Creates and displays workspace number indicators on all monitors
+InitializeOverlays() { ; Creates and displays workspace number indicators and monitor border on all monitors
     ; Reference global variables
-    global MonitorWorkspaces, WorkspaceOverlays
+    global MonitorWorkspaces, WorkspaceOverlays, BORDER_VISIBLE
 
     ; Create an overlay for each monitor
     monitorCount := MonitorGetCount() ; Gets the total number of physical monitors to determine which monitor contains the window
@@ -1165,10 +1176,95 @@ InitializeOverlays() { ; Creates and displays workspace number indicators on all
         CreateOverlay(monitorIndex) ; Create overlay for this monitor
     }
 
+    ; Create border overlays for all monitors
+    InitializeMonitorBorders()
+
     ; Show all overlays initially
     UpdateAllOverlays() ; Update and show all overlays permanently
 
+    ; Update the active monitor border based on current mouse position
+    UpdateActiveMonitorBorder()
+
     ; No timer needed as we're using persistent overlays
+}
+
+InitializeMonitorBorders() { ; Creates border overlays for all monitors
+    ; Reference global variables
+    global BorderOverlay, DEBUG_MODE, BORDER_COLOR, BORDER_THICKNESS
+
+    ; Clear any existing border overlays
+    for _, overlay in BorderOverlay {
+        try {
+            overlay.Destroy()
+        } catch Error as err {
+            if (DEBUG_MODE)
+                LogMessage("Error destroying border overlay: " err.Message)
+        }
+    }
+    BorderOverlay := Map()
+
+    ; Create new border overlays for each monitor
+    monitorCount := MonitorGetCount()
+
+    loop monitorCount {
+        monitorIndex := A_Index
+
+        ; Get monitor dimensions
+        MonitorGetWorkArea(monitorIndex, &mLeft, &mTop, &mRight, &mBottom)
+
+        ; Create the border components (4 thin gui elements for each edge)
+        CreateMonitorBorder(monitorIndex, mLeft, mTop, mRight, mBottom)
+
+        if (DEBUG_MODE)
+            LogMessage("Created border overlay for monitor " monitorIndex)
+    }
+}
+
+CreateMonitorBorder(monitorIndex, mLeft, mTop, mRight, mBottom) { ; Creates border for a specific monitor
+    ; Reference global variables
+    global BorderOverlay, BORDER_COLOR, BORDER_THICKNESS, BORDER_VISIBLE
+
+    ; Create a map to store the 4 edges of this monitor's border
+    BorderOverlay[monitorIndex] := Map()
+
+    ; Calculate dimensions
+    width := mRight - mLeft
+    height := mBottom - mTop
+
+    ; Create top edge
+    topEdge := Gui("+AlwaysOnTop -Caption +ToolWindow +Owner")
+    topEdge.BackColor := BORDER_COLOR
+    topEdge.Show("x" mLeft " y" mTop " w" width " h" BORDER_THICKNESS " NoActivate")
+    WinSetTransparent(200, "ahk_id " topEdge.Hwnd)
+
+    ; Create bottom edge
+    bottomEdge := Gui("+AlwaysOnTop -Caption +ToolWindow +Owner")
+    bottomEdge.BackColor := BORDER_COLOR
+    bottomEdge.Show("x" mLeft " y" (mBottom - BORDER_THICKNESS) " w" width " h" BORDER_THICKNESS " NoActivate")
+    WinSetTransparent(200, "ahk_id " bottomEdge.Hwnd)
+
+    ; Create left edge
+    leftEdge := Gui("+AlwaysOnTop -Caption +ToolWindow +Owner")
+    leftEdge.BackColor := BORDER_COLOR
+    leftEdge.Show("x" mLeft " y" mTop " w" BORDER_THICKNESS " h" height " NoActivate")
+    WinSetTransparent(200, "ahk_id " leftEdge.Hwnd)
+
+    ; Create right edge
+    rightEdge := Gui("+AlwaysOnTop -Caption +ToolWindow +Owner")
+    rightEdge.BackColor := BORDER_COLOR
+    rightEdge.Show("x" (mRight - BORDER_THICKNESS) " y" mTop " w" BORDER_THICKNESS " h" height " NoActivate")
+    WinSetTransparent(200, "ahk_id " rightEdge.Hwnd)
+
+    ; Store the edges
+    BorderOverlay[monitorIndex]["top"] := topEdge
+    BorderOverlay[monitorIndex]["bottom"] := bottomEdge
+    BorderOverlay[monitorIndex]["left"] := leftEdge
+    BorderOverlay[monitorIndex]["right"] := rightEdge
+
+    ; Hide all borders initially (we'll show only the active monitor border)
+    if (BORDER_VISIBLE) {
+        HideMonitorBorder(monitorIndex)
+    }
 }
 
 ; Function to gather information about which windows are in each workspace
@@ -1377,6 +1473,97 @@ ToggleOverlays() { ; Toggles visibility of workspace indicators
     }
 
     isVisible := !isVisible
+}
+
+ShowMonitorBorder(monitorIndex) { ; Shows the border for a specific monitor
+    ; Reference global variables
+    global BorderOverlay, DEBUG_MODE
+
+    try {
+        if (BorderOverlay.Has(monitorIndex)) {
+            edges := BorderOverlay[monitorIndex]
+
+            for edge, gui in edges {
+                gui.Show("NoActivate")
+            }
+
+            if (DEBUG_MODE)
+                LogMessage("Showed border for monitor " monitorIndex)
+        }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Error showing monitor border: " err.Message)
+    }
+}
+
+HideMonitorBorder(monitorIndex) { ; Hides the border for a specific monitor
+    ; Reference global variables
+    global BorderOverlay, DEBUG_MODE
+
+    try {
+        if (BorderOverlay.Has(monitorIndex)) {
+            edges := BorderOverlay[monitorIndex]
+
+            for edge, gui in edges {
+                gui.Hide()
+            }
+
+            if (DEBUG_MODE)
+                LogMessage("Hid border for monitor " monitorIndex)
+        }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Error hiding monitor border: " err.Message)
+    }
+}
+
+UpdateActiveMonitorBorder() { ; Updates the active monitor border based on current mouse position
+    ; Reference global variables
+    global LAST_ACTIVE_MONITOR, DEBUG_MODE, BORDER_VISIBLE
+
+    ; If borders are toggled off, do nothing
+    if (!BORDER_VISIBLE)
+        return
+
+    ; Get current active monitor based on mouse position
+    currentMonitor := GetActiveMonitor()
+
+    ; Only update if there's a change
+    if (currentMonitor != LAST_ACTIVE_MONITOR) {
+        if (DEBUG_MODE)
+            LogMessage("Active monitor changed from " LAST_ACTIVE_MONITOR " to " currentMonitor)
+
+        ; Hide border on previous monitor
+        if (LAST_ACTIVE_MONITOR > 0)
+            HideMonitorBorder(LAST_ACTIVE_MONITOR)
+
+        ; Show border on new active monitor
+        ShowMonitorBorder(currentMonitor)
+
+        ; Update last active monitor
+        LAST_ACTIVE_MONITOR := currentMonitor
+    }
+}
+
+ToggleMonitorBorders() { ; Toggles visibility of all monitor borders
+    ; Reference global variables
+    global BorderOverlay, BORDER_VISIBLE, DEBUG_MODE
+
+    ; Toggle the visibility state
+    BORDER_VISIBLE := !BORDER_VISIBLE
+
+    if (DEBUG_MODE)
+        LogMessage("Monitor borders toggled: " (BORDER_VISIBLE ? "ON" : "OFF"))
+
+    if (BORDER_VISIBLE) {
+        ; Show only active monitor border
+        UpdateActiveMonitorBorder()
+    } else {
+        ; Hide all borders
+        for monitorIndex in BorderOverlay {
+            HideMonitorBorder(monitorIndex)
+        }
+    }
 }
 
 ; Function to show/hide an overlay with a list of windows in each workspace
@@ -1599,20 +1786,27 @@ global WorkspaceOverlays := Map()
 ; Workspace window list overlay
 global WindowListOverlay := ""
 global WindowListVisible := false
+; Active monitor border overlay
+global BorderOverlay := Map()
+global BORDER_VISIBLE := true
 ; Overlay display settings
 global OVERLAY_SIZE := 60 ; Size of overlay in pixels (increased for better visibility)
 global OVERLAY_MARGIN := 20 ; Margin from screen edge
 global OVERLAY_TIMEOUT := 0 ; Time in ms before overlay fades (0 for persistent display)
 global OVERLAY_OPACITY := 220 ; 0-255 (0 = transparent, 255 = opaque)
 global OVERLAY_POSITION := "BottomRight" ; TopLeft, TopRight, BottomLeft, BottomRight
+global BORDER_COLOR := "33FFFF" ; Cyan color for active monitor border
+global BORDER_THICKNESS := 3 ; Thickness of the monitor border in pixels
+global LAST_ACTIVE_MONITOR := 0 ; Tracks the last known active monitor
 
 ; ====== Initialization ======
 ; Create a simple message box to indicate script has started
 MsgBox("Cerberus Workspace Manager starting..."
       "`nPress OK to continue"
       "`nPress Ctrl+1 through Ctrl+9 to switch workspaces"
-      "`nPress Ctrl+0 to toggle workspace number overlays"
-      "`nPress Ctrl+` to toggle window assignments overlay", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
+      "`nPress Ctrl+0 to toggle workspace number overlays and monitor border"
+      "`nPress Ctrl+` to toggle window assignments overlay"
+      "`nActive monitor (based on mouse position) is highlighted with a border", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
 
 CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
 SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations
@@ -1625,6 +1819,17 @@ InitializeOverlays() ; Create workspace overlay displays - adds visual indicator
 ; Set up periodic cleanup of window references (every 2 minutes)
 SetTimer(CleanupWindowReferences, 120000)
 
+; Set up periodic check for mouse movement to update active monitor border
+SetTimer(CheckMouseMovement, 100) ; Check every 100ms
+
+; Function to periodically check mouse position and update active monitor border
+CheckMouseMovement(*) {
+    ; Only check for active monitor updates when border is visible
+    if (BORDER_VISIBLE) {
+        UpdateActiveMonitorBorder()
+    }
+}
+
 ; ====== Keyboard Shortcuts ======
 ; Ctrl+1 through Ctrl+9 for switching workspaces
 ^1::SwitchToWorkspace(1) ; Ctrl+1 hotkey to switch to workspace 1
@@ -1636,10 +1841,19 @@ SetTimer(CleanupWindowReferences, 120000)
 ^7::SwitchToWorkspace(7) ; Ctrl+7 hotkey to switch to workspace 7
 ^8::SwitchToWorkspace(8) ; Ctrl+8 hotkey to switch to workspace 8
 ^9::SwitchToWorkspace(9) ; Ctrl+9 hotkey to switch to workspace 9
-; Ctrl+0 to toggle workspace overlays
-^0::ToggleOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays
+; Ctrl+0 to toggle workspace overlays and monitor border
+^0::ToggleBordersAndOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays and monitor border
 ; Ctrl+` to toggle window workspace information overlay
 ^`::ShowWorkspaceWindowList() ; Ctrl+` hotkey to toggle overlay showing windows in each workspace
+
+; Function to toggle both workspace overlays and monitor borders with Ctrl+0
+ToggleBordersAndOverlays() {
+    ; Toggle workspace number overlays
+    ToggleOverlays()
+
+    ; Toggle monitor borders separately
+    ToggleMonitorBorders()
+}
 
 ; ====== Register Event Handlers ======
 ; Track window move/resize events to update layouts

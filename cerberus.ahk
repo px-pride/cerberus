@@ -696,11 +696,15 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
 
     ; Set the flag to indicate switch is in progress
     SWITCH_IN_PROGRESS := True
-    
+
     try {
         ; Log the start of workspace switching
         LogMessage("------------- WORKSPACE SWITCH START -------------")
         LogMessage("Switching to workspace: " requestedID)
+
+        ; Log workspace window contents BEFORE the switch
+        if (DEBUG_MODE)
+            LogWorkspaceWindowContents("BEFORE SWITCH:")
 
         ; Get active monitor
         activeMonitor := GetActiveMonitor() ; Gets the monitor index that contains the currently active (focused) window
@@ -859,7 +863,7 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
             if (DEBUG_MODE)
                 LogMessage("Standard workspace switch - no exchange needed")
 
-            ; ====== STEP 1: Identify and minimize all windows on the active monitor ======
+            ; ====== STEP 1: Identify and minimize windows that don't belong to requested workspace ======
             ; Get all open windows
             windows := WinGetList() ; Gets a list of all open windows
             if (DEBUG_MODE)
@@ -871,13 +875,16 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                 if (!IsWindowValid(hwnd))
                     continue
 
-                ; Check if window is on active monitor
+                ; Get window info for checking workspace assignment
+                title := WinGetTitle(hwnd)
+                workspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
                 windowMonitor := GetWindowMonitor(hwnd)
-                if (windowMonitor = activeMonitor) {
-                    ; Directly minimize the window on active monitor
-                    title := WinGetTitle(hwnd)
+
+                ; Only minimize windows on the active monitor that don't belong to requested workspace
+                if (windowMonitor = activeMonitor && workspaceID != requestedID) {
+                    ; This window is on the active monitor but belongs to a different workspace
                     if (DEBUG_MODE)
-                        LogMessage("MINIMIZING window on active monitor: " title)
+                        LogMessage("MINIMIZING window (workspace " workspaceID ") on active monitor: " title)
 
                     ; Force the window to minimize
                     try {
@@ -919,11 +926,33 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                 windowMonitor := GetWindowMonitor(hwnd)
                 winState := WinGetMinMax(hwnd)
 
-                ; Check if window is on active monitor
-                if (windowMonitor = activeMonitor) {
-                    ; This is a window that should be restored for the new workspace
+                ; Check if window belongs to the requested workspace
+                workspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
+
+                if (workspaceID = requestedID) {
+                    ; This is a window that belongs to the requested workspace
+
+                    ; Move it to the active monitor if it's not already there
+                    if (windowMonitor != activeMonitor) {
+                        ; Get monitor dimensions
+                        MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
+
+                        ; Get window size
+                        WinGetPos(&x, &y, &width, &height, "ahk_id " hwnd)
+
+                        ; Center window on active monitor
+                        newX := mLeft + (mRight - mLeft - width) / 2
+                        newY := mTop + (mBottom - mTop - height) / 2
+
+                        ; Move window to active monitor
+                        WinMove(newX, newY, width, height, "ahk_id " hwnd)
+
+                        if (DEBUG_MODE)
+                            LogMessage("MOVING window from monitor " windowMonitor " to active monitor " activeMonitor ": " title)
+                    }
+
                     if (DEBUG_MODE)
-                        LogMessage("RESTORING window for new workspace: " title)
+                        LogMessage("RESTORING window for workspace " requestedID ": " title)
 
                     ; Force window restore - the WindowMoveResizeHandler will handle workspace assignment
                     try {
@@ -947,9 +976,6 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
             if (DEBUG_MODE)
                 LogMessage("Restored " restoreCount " windows for workspace " requestedID)
         }
-
-        if (DEBUG_MODE)
-            LogMessage("------------- WORKSPACE SWITCH END -------------")
     }
     catch Error as err {
         ; Log the error
@@ -957,15 +983,23 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
             LogMessage("ERROR during workspace switch: " err.Message)
     }
     finally {
-        ; Always clear the switch in progress flag, even if there was an error
-        SWITCH_IN_PROGRESS := False
-
         ; Always update overlays to ensure they reflect the current workspace state,
         ; even if there was an error or early return in the switch logic
         UpdateAllOverlays()
 
         ; Also update the workspace window overlay if it's visible
         UpdateWorkspaceWindowOverlay()
+
+        ; Log workspace window contents AFTER the switch
+        if (DEBUG_MODE)
+            LogWorkspaceWindowContents("AFTER SWITCH:")
+
+        ; Log that the workspace switch is complete
+        if (DEBUG_MODE)
+            LogMessage("------------- WORKSPACE SWITCH END -------------")
+
+        ; Always clear the switch in progress flag, even if there was an error
+        SWITCH_IN_PROGRESS := False
     }
 }
 ; Clean up stale window references to prevent memory leaks
@@ -1644,6 +1678,71 @@ GetWorkspaceWindowInfo() {
     }
 
     return windowsByWorkspace
+}
+
+; Function to log detailed workspace window information
+LogWorkspaceWindowContents(prefix := "") {
+    ; Reference global variables
+    global DEBUG_MODE, MAX_WORKSPACES, WindowWorkspaces
+
+    if (!DEBUG_MODE)
+        return
+
+    ; Get window information
+    windowsByWorkspace := GetWorkspaceWindowInfo()
+
+    ; Start log message
+    LogMessage(prefix " ===== WORKSPACE WINDOW CONTENTS =====")
+
+    ; Log each workspace's windows
+    totalWindows := 0
+    for workspaceID in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] {
+        if (workspaceID > MAX_WORKSPACES && workspaceID != 0)
+            continue
+
+        if (windowsByWorkspace.Has(workspaceID)) {
+            windows := windowsByWorkspace[workspaceID]
+
+            ; Log workspace header
+            if (workspaceID = 0)
+                LogMessage(prefix " UNASSIGNED WORKSPACE: " windows.Length " windows")
+            else
+                LogMessage(prefix " WORKSPACE " workspaceID ": " windows.Length " windows")
+
+            ; Log each window in this workspace
+            for index, window in windows {
+                title := window.title
+                hwnd := window.hwnd
+
+                ; Get window state information for more detail
+                try {
+                    isMinimized := WinGetMinMax("ahk_id " hwnd) = -1
+                    isMaximized := WinGetMinMax("ahk_id " hwnd) = 1
+
+                    ; Get monitor info if possible
+                    monitorIndex := GetWindowMonitor(hwnd)
+
+                    ; Create state string
+                    stateStr := isMinimized ? "MINIMIZED" : (isMaximized ? "MAXIMIZED" : "NORMAL")
+
+                    ; Log window details
+                    LogMessage(prefix "   [" index "] hwnd: " hwnd ", title: '" title "', state: " stateStr ", monitor: " monitorIndex)
+                } catch Error as err {
+                    ; Simpler log if error occurs getting details
+                    LogMessage(prefix "   [" index "] hwnd: " hwnd ", title: '" title "', ERROR: " err.Message)
+                }
+            }
+
+            totalWindows += windows.Length
+        } else if (workspaceID != 0) {
+            ; Log empty workspace
+            LogMessage(prefix " WORKSPACE " workspaceID ": 0 windows")
+        }
+    }
+
+    ; Log summary
+    LogMessage(prefix " Total windows: " totalWindows)
+    LogMessage(prefix " ===== END WORKSPACE WINDOW CONTENTS =====")
 }
 
 CreateOverlay(monitorIndex) { ; Creates workspace indicator overlay for specified monitor

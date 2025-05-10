@@ -1827,8 +1827,8 @@ UpdateActiveMonitorBorder() { ; Updates the active monitor border based on curre
     ; Get current active monitor based on mouse position
     currentMonitor := GetActiveMonitor()
 
-    ; Only update if there's a change
-    if (currentMonitor != LAST_ACTIVE_MONITOR) {
+    ; Check if we need to update the border
+    if (currentMonitor != LAST_ACTIVE_MONITOR || LAST_ACTIVE_MONITOR == 0) {
         if (DEBUG_MODE)
             LogMessage("Active monitor changed from " LAST_ACTIVE_MONITOR " to " currentMonitor)
 
@@ -1841,12 +1841,15 @@ UpdateActiveMonitorBorder() { ; Updates the active monitor border based on curre
 
         ; Update last active monitor
         LAST_ACTIVE_MONITOR := currentMonitor
+    } else {
+        ; Even if the monitor hasn't changed, ensure the border is visible
+        ShowMonitorBorder(currentMonitor)
     }
 }
 
 ToggleMonitorBorders() { ; Toggles visibility of all monitor borders
     ; Reference global variables
-    global BorderOverlay, BORDER_VISIBLE, DEBUG_MODE
+    global BorderOverlay, BORDER_VISIBLE, DEBUG_MODE, LAST_ACTIVE_MONITOR
 
     ; Toggle the visibility state
     BORDER_VISIBLE := !BORDER_VISIBLE
@@ -1855,8 +1858,17 @@ ToggleMonitorBorders() { ; Toggles visibility of all monitor borders
         LogMessage("Monitor borders toggled: " (BORDER_VISIBLE ? "ON" : "OFF"))
 
     if (BORDER_VISIBLE) {
-        ; Show only active monitor border
-        UpdateActiveMonitorBorder()
+        ; Get the current active monitor
+        currentMonitor := GetActiveMonitor()
+
+        ; Force show active monitor border regardless of whether it has changed
+        ShowMonitorBorder(currentMonitor)
+
+        ; Update last active monitor
+        LAST_ACTIVE_MONITOR := currentMonitor
+
+        if (DEBUG_MODE)
+            LogMessage("Showing border for monitor " currentMonitor)
     } else {
         ; Hide all borders
         for monitorIndex in BorderOverlay {

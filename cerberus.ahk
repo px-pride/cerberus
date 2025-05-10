@@ -756,19 +756,16 @@ CleanupWindowReferences() {
     
     ; Clean up WindowWorkspaces map
     workspaceStaleCount := 0
-    updated := false
     for hwnd, workspaceID in WindowWorkspaces {
         try {
             if !WinExist(hwnd) {
                 WindowWorkspaces.Delete(hwnd)
                 workspaceStaleCount++
-                updated := true
             }
         } catch Error as err {
             ; If there's an error, remove this reference anyway
             WindowWorkspaces.Delete(hwnd)
             workspaceStaleCount++
-            updated := true
         }
     }
 
@@ -1261,6 +1258,9 @@ ToggleOverlays() { ; Toggles visibility of workspace indicators
 
 ; Function to show/hide an overlay with a list of windows in each workspace
 ShowWorkspaceWindowList() {
+    ; Reference global variables
+    global WindowListVisible, WindowListOverlay
+
     ; Toggle the overlay visibility
     if (WindowListVisible && WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
         HideWorkspaceWindowList()
@@ -1271,6 +1271,9 @@ ShowWorkspaceWindowList() {
 
 ; Function to hide the workspace window overlay
 HideWorkspaceWindowList() {
+    ; Reference global variables
+    global WindowListVisible, WindowListOverlay
+
     if (WindowListVisible && WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
         WindowListOverlay.Destroy()
         WindowListOverlay := ""
@@ -1280,6 +1283,9 @@ HideWorkspaceWindowList() {
 
 ; Function to update the workspace window overlay if it's visible
 UpdateWorkspaceWindowOverlay() {
+    ; Reference global variables
+    global WindowListVisible, WindowListOverlay
+
     ; If the workspace window overlay is visible, update it
     if (WindowListVisible && WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
         ShowWorkspaceWindowOverlay() ; This will recreate the overlay with updated information
@@ -1288,6 +1294,9 @@ UpdateWorkspaceWindowOverlay() {
 
 ; Function to show or update the workspace window overlay
 ShowWorkspaceWindowOverlay() {
+    ; Reference global variables
+    global WindowListVisible, WindowListOverlay, MAX_WORKSPACES
+
     ; First destroy any existing overlay
     if (WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
         WindowListOverlay.Destroy()
@@ -1330,6 +1339,9 @@ ShowWorkspaceWindowOverlay() {
 
 ; Helper function to build the text display for workspace windows
 BuildWorkspaceWindowText(windowsByWorkspace) {
+    ; Reference global variables
+    global MAX_WORKSPACES
+
     text := "==========================================`n"
     text .= "           WORKSPACE WINDOWS`n"
     text .= "==========================================`n`n"

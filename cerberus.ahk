@@ -1053,16 +1053,60 @@ InitializeOverlays() { ; Creates and displays workspace number indicators on all
 
     ; Create an overlay for each monitor
     monitorCount := MonitorGetCount() ; Gets the total number of physical monitors to determine which monitor contains the window
-    
+
     loop monitorCount {
         monitorIndex := A_Index
         CreateOverlay(monitorIndex) ; Create overlay for this monitor
     }
-    
+
     ; Show all overlays initially
     UpdateAllOverlays() ; Update and show all overlays permanently
-    
+
     ; No timer needed as we're using persistent overlays
+}
+
+; Function to gather information about which windows are in each workspace
+GetWorkspaceWindowInfo() {
+    ; Reference global variables
+    global WindowWorkspaces, MAX_WORKSPACES
+
+    ; Create a structure to hold window info by workspace
+    windowsByWorkspace := Map()
+
+    ; Initialize map for each workspace
+    loop MAX_WORKSPACES {
+        windowsByWorkspace[A_Index] := []
+    }
+
+    ; Add special category for unassigned windows (workspace 0)
+    windowsByWorkspace[0] := []
+
+    ; Collect all valid windows and group them by workspace
+    windows := WinGetList() ; Get all window handles
+
+    for hwnd in windows {
+        ; Skip invalid windows
+        if (!IsWindowValid(hwnd))
+            continue
+
+        ; Get window info
+        title := WinGetTitle(hwnd)
+
+        ; Skip windows with no title
+        if (title = "")
+            continue
+
+        ; Check if window has a workspace assignment
+        workspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
+
+        ; Add window to appropriate workspace list
+        windowsByWorkspace[workspaceID].Push({
+            hwnd: hwnd,
+            title: title
+        })
+    }
+
+    return windowsByWorkspace
 }
 
 CreateOverlay(monitorIndex) { ; Creates workspace indicator overlay for specified monitor
@@ -1193,6 +1237,92 @@ ToggleOverlays() { ; Toggles visibility of workspace indicators
     isVisible := !isVisible
 }
 
+; Function to show an overlay with a list of windows in each workspace
+ShowWorkspaceWindowList() {
+    ; Get current window information for all workspaces
+    windowsByWorkspace := GetWorkspaceWindowInfo()
+
+    ; Create a new GUI for the workspace window list
+    listGui := Gui("+AlwaysOnTop +ToolWindow +Owner")
+    listGui.Title := "Workspace Windows"
+    listGui.SetFont("s10", "Segoe UI")
+    listGui.BackColor := "1E1E1E" ; Dark background
+
+    ; Set a reasonable size for the GUI
+    guiWidth := 600
+    guiHeight := 600
+
+    ; Add a ListView to display the workspace information
+    lv := listGui.Add("ListView", "Grid NoSortHdr -Multi w" guiWidth " h" guiHeight, ["Workspace", "Window Title"])
+    lv.Opt("Background121212 cWhite")
+    lv.SetFont("s10", "Segoe UI")
+
+    ; Set list view column widths - use the more modern way to modify columns
+    lv.ModifyCol(1, 100)
+    lv.ModifyCol(2, 450)
+
+    ; Add rows to the ListView, organized by workspace
+    totalWindows := 0
+
+    ; Start with workspace 1-9
+    loop MAX_WORKSPACES {
+        workspaceID := A_Index
+        windows := windowsByWorkspace[workspaceID]
+
+        ; If this workspace has windows, add them to the list
+        if (windows.Length > 0) {
+            ; Add a workspace header
+            lv.Add("", "Workspace " workspaceID, "")
+
+            ; Add each window in this workspace
+            for index, window in windows {
+                truncatedTitle := SubStr(window.title, 1, 70) ; Truncate long titles
+                if (StrLen(window.title) > 70)
+                    truncatedTitle .= "..."
+
+                lv.Add("", "", truncatedTitle)
+                totalWindows++
+            }
+
+            ; Add a separator row after each workspace group
+            lv.Add("", "", "")
+        }
+    }
+
+    ; Add unassigned windows (workspace 0) at the end if there are any
+    unassignedWindows := windowsByWorkspace[0]
+    if (unassignedWindows.Length > 0) {
+        lv.Add("", "Unassigned", "")
+
+        for index, window in unassignedWindows {
+            truncatedTitle := SubStr(window.title, 1, 70) ; Truncate long titles
+            if (StrLen(window.title) > 70)
+                truncatedTitle .= "..."
+
+            lv.Add("", "", truncatedTitle)
+            totalWindows++
+        }
+    }
+
+    ; Update the title with window count
+    listGui.Title := "Workspace Windows - " totalWindows " windows"
+
+    ; Center the GUI on screen
+    screenWidth := A_ScreenWidth
+    screenHeight := A_ScreenHeight
+    xPos := (screenWidth - guiWidth) / 2
+    yPos := (screenHeight - guiHeight) / 2
+
+    ; Show the GUI
+    listGui.Show("x" xPos " y" yPos " w" guiWidth " h" guiHeight)
+
+    ; Set a timer to automatically close the overlay after a period
+    closeTimeout := 10000 ; 10 seconds
+    SetTimer(() => listGui.Destroy(), -closeTimeout)
+
+    return listGui
+}
+
 ; ====== Configuration ======
 MAX_WORKSPACES := 9  ; Maximum number of workspaces (1-9)
 MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
@@ -1228,7 +1358,8 @@ global OVERLAY_POSITION := "BottomRight" ; TopLeft, TopRight, BottomLeft, Bottom
 MsgBox("Cerberus Workspace Manager starting..."
       "`nPress OK to continue"
       "`nPress Ctrl+1 through Ctrl+9 to switch workspaces"
-      "`nPress Ctrl+0 to toggle overlays", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
+      "`nPress Ctrl+0 to toggle overlays"
+      "`nPress Ctrl+` to show window assignments", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
 
 CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
 SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations
@@ -1254,6 +1385,8 @@ SetTimer(CleanupWindowReferences, 120000)
 ^9::SwitchToWorkspace(9) ; Ctrl+9 hotkey to switch to workspace 9
 ; Ctrl+0 to toggle workspace overlays
 ^0::ToggleOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays
+; Ctrl+` to show window workspace assignments
+^`::ShowWorkspaceWindowList() ; Ctrl+` hotkey to show a list of windows in each workspace
 
 ; ====== Register Event Handlers ======
 ; Track window move/resize events to update layouts

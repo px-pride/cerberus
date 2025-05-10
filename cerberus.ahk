@@ -1090,7 +1090,10 @@ InitializeOverlays() { ; Creates and displays workspace number indicators on all
 ; Function to gather information about which windows are in each workspace
 GetWorkspaceWindowInfo() {
     ; Reference global variables
-    global WindowWorkspaces, MAX_WORKSPACES
+    global WindowWorkspaces, MAX_WORKSPACES, DEBUG_MODE
+
+    if (DEBUG_MODE)
+        LogMessage("Getting fresh window workspace information")
 
     ; Create a structure to hold window info by workspace
     windowsByWorkspace := Map()
@@ -1103,29 +1106,58 @@ GetWorkspaceWindowInfo() {
     ; Add special category for unassigned windows (workspace 0)
     windowsByWorkspace[0] := []
 
-    ; Collect all valid windows and group them by workspace
-    windows := WinGetList() ; Get all window handles
+    ; Force a check of the window list (ensure we get the most current windows)
+    try {
+        ; Collect all valid windows and group them by workspace
+        windows := WinGetList() ; Get all window handles
 
-    for hwnd in windows {
-        ; Skip invalid windows
-        if (!IsWindowValid(hwnd))
-            continue
+        if (DEBUG_MODE)
+            LogMessage("Processing " windows.Length " windows for workspace list")
 
-        ; Get window info
-        title := WinGetTitle(hwnd)
+        windowCount := 0
 
-        ; Skip windows with no title
-        if (title = "")
-            continue
+        for hwnd in windows {
+            ; Skip invalid windows
+            if (!IsWindowValid(hwnd))
+                continue
 
-        ; Check if window has a workspace assignment
-        workspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
+            ; Get window info
+            title := WinGetTitle(hwnd)
 
-        ; Add window to appropriate workspace list
-        windowsByWorkspace[workspaceID].Push({
-            hwnd: hwnd,
-            title: title
-        })
+            ; Skip windows with no title
+            if (title = "")
+                continue
+
+            ; Check if window has a workspace assignment
+            workspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
+
+            ; Add window to appropriate workspace list
+            windowsByWorkspace[workspaceID].Push({
+                hwnd: hwnd,
+                title: title
+            })
+
+            windowCount++
+        }
+
+        if (DEBUG_MODE)
+            LogMessage("Added " windowCount " windows to workspace list")
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Error gathering window information: " err.Message)
+    }
+
+    ; Check the window counts for debugging
+    if (DEBUG_MODE) {
+        totalWindows := 0
+        for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] {
+            if (windowsByWorkspace.Has(i)) {
+                count := windowsByWorkspace[i].Length
+                LogMessage("Found " count " windows in workspace " i)
+                totalWindows += count
+            }
+        }
+        LogMessage("Total windows counted: " totalWindows)
     }
 
     return windowsByWorkspace
@@ -1293,8 +1325,35 @@ HideWorkspaceWindowList() {
 
 ; Function for periodic updates of the workspace window overlay
 PeriodicOverlayUpdate(*) {
-    ; Refresh the workspace window list if visible
-    UpdateWorkspaceWindowOverlay()
+    ; Reference global variables
+    global WindowListVisible, WindowListOverlay, DEBUG_MODE
+
+    if (DEBUG_MODE)
+        LogMessage("Periodic update check for workspace window overlay")
+
+    ; Only proceed if the overlay is visible
+    if (WindowListVisible && WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
+        ; Get fresh window information and rebuild the overlay completely
+        if (DEBUG_MODE)
+            LogMessage("Refreshing workspace window overlay with current window state")
+
+        ; Get current window information
+        windowsByWorkspace := GetWorkspaceWindowInfo()
+
+        ; Update the text in the overlay directly without recreating it
+        windowList := BuildWorkspaceWindowText(windowsByWorkspace)
+
+        ; Find the text control and update it
+        try {
+            for ctrl in WindowListOverlay {
+                ctrl.Value := windowList
+                break ; Only update the first control (which is our text control)
+            }
+        } catch Error as err {
+            if (DEBUG_MODE)
+                LogMessage("Error updating overlay text: " err.Message)
+        }
+    }
 }
 
 ; Function to update the workspace window overlay if it's visible
@@ -1307,8 +1366,8 @@ UpdateWorkspaceWindowOverlay() {
         if (DEBUG_MODE)
             LogMessage("Updating workspace window overlay due to window changes")
 
-        ; Force a refresh by destroying the current overlay and creating a new one
-        ShowWorkspaceWindowOverlay() ; This will recreate the overlay with updated information
+        ; Call our improved periodic update function that directly updates the content
+        PeriodicOverlayUpdate()
     }
 }
 

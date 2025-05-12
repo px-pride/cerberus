@@ -71,13 +71,15 @@ BORDER_THICKNESS := 3   ; Thickness of monitor border in pixels
 
 ## Bugs
 
+- initial prompt timing out
 - backtick overlay not updating
+- many transient crash messages on startup
 - many transient crash messages on completion
 
 ## Feature Requests
 
-- system tray icon
 - system tray right-click configuration menu
+- better system tray icon
 
 ## Troubleshooting
 

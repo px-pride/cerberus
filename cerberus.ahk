@@ -4,6 +4,9 @@
 ; Cerberus - Multi-monitor workspace management system
 ; To enable debug mode, change DEBUG_MODE to True below
 
+; Set custom tray icon
+TraySetIcon(A_ScriptDir "\cerberus.ico")
+
 ; ====== Function Definitions ======
 
 ; ----- Core System Functions -----

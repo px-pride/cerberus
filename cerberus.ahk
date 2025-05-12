@@ -177,69 +177,97 @@ IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
 }
 
 GetWindowMonitor(hwnd) { ; Determines which monitor contains the window
-    ; Reference global variables
-    global DEBUG_MODE
+    ; This is now a wrapper for the improved GetWindowMonitorIndex function
+    return GetWindowMonitorIndex(hwnd)
+}
 
-    ; First quickly check if the window handle is valid
+GetWindowMonitorIndex(windowHandle) { ; Improved version with better error handling
+    ; Validate the windowHandle parameter
     try {
-        if (!WinExist("ahk_id " hwnd)) {
+        if (!windowHandle || windowHandle = 0) {
             if (DEBUG_MODE)
-                LogMessage("GetWindowMonitor: Window handle " hwnd " does not exist")
+                LogMessage("GetWindowMonitorIndex: Invalid window handle (null or zero)")
             return 1 ; Default to primary monitor
         }
     } catch Error as err {
         if (DEBUG_MODE)
-            LogMessage("GetWindowMonitor: Error checking window existence: " err.Message)
+            LogMessage("GetWindowMonitorIndex: Error validating handle parameter: " err.Message)
         return 1 ; Default to primary monitor
     }
 
+    ; Verify window still exists
     try {
-        monitorCount := MonitorGetCount() ; Gets the total number of physical monitors to determine which monitor contains the window
+        if (!WinExist("ahk_id " windowHandle)) {
+            if (DEBUG_MODE)
+                LogMessage("GetWindowMonitorIndex: Window " windowHandle " no longer exists")
+            return 1 ; Default to primary monitor
+        }
+    } catch Error as existErr {
+        if (DEBUG_MODE)
+            LogMessage("GetWindowMonitorIndex: Error checking window existence: " existErr.Message)
+        return 1 ; Default to primary monitor
+    }
+
+    ; Get monitor count - handle error gracefully
+    try {
+        monitorCount := MonitorGetCount()
+        if (monitorCount <= 0) {
+            if (DEBUG_MODE)
+                LogMessage("GetWindowMonitorIndex: Invalid monitor count: " monitorCount)
+            return 1 ; Default to primary monitor
+        }
 
         if (monitorCount = 1)
-            return 1
+            return 1 ; Only one monitor, must be that one
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("GetWindowMonitorIndex: Error getting monitor count: " err.Message)
+        return 1 ; Default to primary monitor
+    }
 
-        ; Get window position - this can fail if the window is invalid
+    ; Safely get window position
+    try {
+        ; Use a nested try-catch for the WinGetPos call specifically
         try {
-            ; Add explicit error handling for WinGetPos
+            WinGetPos(&winX, &winY, &winWidth, &winHeight, "ahk_id " windowHandle)
+        } catch Error as posErr {
+            if (DEBUG_MODE)
+                LogMessage("GetWindowMonitorIndex: WinGetPos failed: " posErr.Message)
+            return 1 ; Default to primary monitor
+        }
+
+        ; Validate position values
+        if (winX = "" || winY = "" || winWidth = "" || winHeight = "") {
+            if (DEBUG_MODE)
+                LogMessage("GetWindowMonitorIndex: Invalid position values for window")
+            return 1 ; Default to primary monitor
+        }
+
+        ; Find window center
+        centerX := winX + winWidth / 2
+        centerY := winY + winHeight / 2
+
+        ; Check which monitor contains this point
+        loop monitorCount {
             try {
-                WinGetPos(&x, &y, &width, &height, "ahk_id " hwnd) ; Retrieves window position and size, storing values in the referenced variables
-            } catch Error as winPosErr {
-                if (DEBUG_MODE)
-                    LogMessage("GetWindowMonitor: WinGetPos failed: " winPosErr.Message)
-                return 1 ; Default to primary monitor on error
-            }
-
-            ; Make sure the values are valid
-            if (x = "" || y = "" || width = "" || height = "") {
-                if (DEBUG_MODE)
-                    LogMessage("GetWindowMonitor: Invalid position values for window " hwnd)
-                return 1 ; Default to primary monitor if we get invalid position values
-            }
-
-            ; Find which monitor contains the center of the window
-            centerX := x + width / 2
-            centerY := y + height / 2
-
-            loop monitorCount {
-                MonitorGetWorkArea(A_Index, &mLeft, &mTop, &mRight, &mBottom) ; Gets coordinates of monitor work area
+                MonitorGetWorkArea(A_Index, &mLeft, &mTop, &mRight, &mBottom)
                 if (centerX >= mLeft && centerX <= mRight && centerY >= mTop && centerY <= mBottom)
                     return A_Index
+            } catch Error as monErr {
+                if (DEBUG_MODE)
+                    LogMessage("GetWindowMonitorIndex: Error getting monitor " A_Index " work area: " monErr.Message)
+                ; Continue checking other monitors
             }
-        } catch Error as err {
-            if (DEBUG_MODE)
-                LogMessage("GetWindowMonitor: Error getting window position: " err.Message)
-            return 1 ; Default to primary monitor on error
         }
     } catch Error as err {
         if (DEBUG_MODE)
-            LogMessage("GetWindowMonitor: Error in function: " err.Message)
-        return 1 ; Default to primary monitor on any error
+            LogMessage("GetWindowMonitorIndex: Error processing window position: " err.Message)
+        return 1 ; Default to primary monitor
     }
 
-    ; Default to primary monitor if no match
+    ; If no monitor contains the window center, default to primary
     if (DEBUG_MODE)
-        LogMessage("GetWindowMonitor: No monitor match found for window " hwnd)
+        LogMessage("GetWindowMonitorIndex: Window not found on any monitor - using primary")
     return 1
 }
 
@@ -532,6 +560,16 @@ LogMessage(message) {
 
 ; Helper function for delayed window checking
 DelayedWindowCheck(hwnd, *) {
+    ; Reference global variables
+    global SCRIPT_EXITING, DEBUG_MODE
+
+    ; Skip if script is exiting
+    if (SCRIPT_EXITING) {
+        if (DEBUG_MODE)
+            LogMessage("Script is exiting, ignoring delayed window check")
+        return
+    }
+
     ; Only call AssignNewWindow if window is still valid
     try {
         ; More careful check for window existence to avoid errors
@@ -1107,7 +1145,14 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
 ; Clean up stale window references to prevent memory leaks
 CleanupWindowReferences() {
     ; Reference global variables
-    global DEBUG_MODE, WindowWorkspaces, WorkspaceLayouts
+    global DEBUG_MODE, SCRIPT_EXITING, WindowWorkspaces, WorkspaceLayouts
+
+    ; Skip if script is exiting
+    if (SCRIPT_EXITING) {
+        if (DEBUG_MODE)
+            LogMessage("Script is exiting, ignoring cleanup timer")
+        return
+    }
 
     ; Clean up lastWindowState map if it exists in the WindowMoveResizeHandler function
     staleCount := 0
@@ -1185,7 +1230,14 @@ CleanupWindowReferences() {
 
 WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resize events to update saved layouts
     ; Reference global variables
-    global SWITCH_IN_PROGRESS, DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
+    global SWITCH_IN_PROGRESS, SCRIPT_EXITING, DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
+
+    ; Skip if script is exiting
+    if (SCRIPT_EXITING) {
+        if (DEBUG_MODE)
+            LogMessage("Script is exiting, ignoring window move/resize event")
+        return
+    }
 
     ; Skip if switch is in progress to avoid recursive operations
     if (SWITCH_IN_PROGRESS) {
@@ -1296,7 +1348,14 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
 
 NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events to assign new windows
     ; Reference global variables
-    global SWITCH_IN_PROGRESS, DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces
+    global SWITCH_IN_PROGRESS, SCRIPT_EXITING, DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces
+
+    ; Skip if script is exiting
+    if (SCRIPT_EXITING) {
+        if (DEBUG_MODE)
+            LogMessage("Script is exiting, ignoring new window event")
+        return
+    }
 
     ; Skip if switch is in progress to avoid recursive operations
     if (SWITCH_IN_PROGRESS) {
@@ -1418,7 +1477,14 @@ NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events t
 ; Handler for window close events
 WindowCloseHandler(wParam, lParam, msg, hwnd) {
     ; Reference global variables
-    global WindowWorkspaces, DEBUG_MODE
+    global WindowWorkspaces, SCRIPT_EXITING, DEBUG_MODE
+
+    ; Skip if script is exiting
+    if (SCRIPT_EXITING) {
+        if (DEBUG_MODE)
+            LogMessage("Script is exiting, ignoring window close event")
+        return
+    }
 
     ; Skip if the window is not being tracked
     if (!WindowWorkspaces.Has(hwnd))
@@ -2113,7 +2179,14 @@ HideWorkspaceWindowList() {
 ; Function for periodic updates of the workspace window overlay
 PeriodicOverlayUpdate(*) {
     ; Reference global variables
-    global WindowListVisible, WindowListOverlay, DEBUG_MODE
+    global WindowListVisible, WindowListOverlay, SCRIPT_EXITING, DEBUG_MODE
+
+    ; Skip if script is exiting
+    if (SCRIPT_EXITING) {
+        if (DEBUG_MODE)
+            LogMessage("Script is exiting, ignoring overlay update")
+        return
+    }
 
     if (DEBUG_MODE)
         LogMessage("Periodic update check for workspace window overlay")
@@ -2286,6 +2359,8 @@ global SHOW_TRAY_NOTIFICATIONS := False  ; Set to True to show tray notification
 ; ===== STATE FLAGS =====
 ; Flag to prevent recursive workspace switching and handler execution
 global SWITCH_IN_PROGRESS := False
+; Flag to indicate script is exiting - handlers should check this and return immediately
+global SCRIPT_EXITING := False
 
 ; Monitor workspace assignments (monitor index → workspace ID)
 global MonitorWorkspaces := Map()
@@ -2311,24 +2386,110 @@ global BORDER_COLOR := "33FFFF" ; Cyan color for active monitor border
 global BORDER_THICKNESS := 3 ; Thickness of the monitor border in pixels
 global LAST_ACTIVE_MONITOR := 0 ; Tracks the last known active monitor
 
-; ====== Initialization ======
-; Create a simple message box to indicate script has started
-MsgBox("Cerberus Instructions:"
-      "`nPress Ctrl+1 through Ctrl+9 to switch workspaces"
-      "`nPress Ctrl+Shift+[Number] to send active window to specific workspace"
-      "`nPress Ctrl+0 to toggle workspace number overlays and monitor border"
-      "`nPress Ctrl+` to toggle window assignments overlay"
-      "`nActive monitor (based on mouse position) is highlighted with a border"
-      "`nPress OK to continue", "Cerberus") ; Shows startup message with key bindings
+; ====== Exit Handler ======
+; Register exit handler to clean up resources on script termination
+OnExit(ExitHandler)
 
+ExitHandler(ExitReason, ExitCode) {
+    global DEBUG_MODE, SCRIPT_EXITING
+
+    ; Set flag to prevent handlers from running during exit
+    SCRIPT_EXITING := True
+
+    if (DEBUG_MODE)
+        LogMessage("===== SCRIPT EXITING (" ExitReason ") =====")
+
+    ; Stop all timers
+    SetTimer(CleanupWindowReferences, 0)
+    SetTimer(CheckMouseMovement, 0)
+    SetTimer(PeriodicOverlayUpdate, 0)
+
+    ; Remove message hooks
+    OnMessage(0x0003, WindowMoveResizeHandler, 0)  ; WM_MOVE
+    OnMessage(0x0005, WindowMoveResizeHandler, 0)  ; WM_SIZE
+    OnMessage(0x0001, NewWindowHandler, 0)         ; WM_CREATE
+    OnMessage(0x0002, WindowCloseHandler, 0)       ; WM_DESTROY
+
+    ; Destroy GUI elements safely
+    try {
+        ; Hide all workspace overlays
+        for monitorIndex, overlay in WorkspaceOverlays {
+            try overlay.Destroy()
+            catch Error as err {
+                if (DEBUG_MODE)
+                    LogMessage("Error destroying workspace overlay: " err.Message)
+            }
+        }
+
+        ; Hide workspace window list if visible
+        if (WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
+            try WindowListOverlay.Destroy()
+            catch Error as err {
+                if (DEBUG_MODE)
+                    LogMessage("Error destroying window list overlay: " err.Message)
+            }
+        }
+
+        ; Clean up monitor borders
+        for monitorIndex, edges in BorderOverlay {
+            for edge, gui in edges {
+                try gui.Destroy()
+                catch Error as err {
+                    if (DEBUG_MODE)
+                        LogMessage("Error destroying border: " err.Message)
+                }
+            }
+        }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Error in cleanup: " err.Message)
+    }
+
+    if (DEBUG_MODE)
+        LogMessage("===== CLEANUP COMPLETE =====")
+}
+
+; ====== Core Initialization ======
+; Set up initial script environment
 CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
 SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations
 DetectHiddenWindows(False) ; Disables detection of hidden windows so they won't be tracked by the script
 
-; ====== Start Cerberus ======
+; Initialize core workspace functionality first (before showing any UI)
 InitializeWorkspaces() ; Call to initialize workspaces when script starts - sets up monitor-workspace mapping and assigns windows
+
+; ====== Show Instructions Dialog ======
+; Start by ensuring our tray icon is correct
+TraySetIcon(A_ScriptDir "\cerberus.ico")
+
+; Create a simple dialog that looks identical to MsgBox but with our icon in the taskbar
+dlg := Gui("+AlwaysOnTop +OwnDialogs")
+dlg.Opt("+SysMenu")  ; Adds an icon to the title bar
+dlg.Title := "Cerberus"
+
+; Add the information text with exact same formatting as the MsgBox
+dlg.SetFont("s9", "Segoe UI")
+dlg.Add("Text", "w372", "Cerberus Instructions:")
+dlg.Add("Text", "w372 y+0", "Press Ctrl+1 through Ctrl+9 to switch workspaces")
+dlg.Add("Text", "w372 y+0", "Press Ctrl+Shift+[Number] to send active window to specific workspace")
+dlg.Add("Text", "w372 y+0", "Press Ctrl+0 to toggle workspace number overlays and monitor border")
+dlg.Add("Text", "w372 y+0", "Press Ctrl+` to toggle window assignments overlay")
+dlg.Add("Text", "w372 y+0", "Active monitor (based on mouse position) is highlighted with a border")
+dlg.Add("Text", "w372 y+0", "Press OK to continue")
+
+; Use a simpler way to center the button with a container
+buttonContainer := dlg.Add("Text", "w372 h1 Center y+15") ; Invisible container for centering
+dlg.Add("Button", "Default w80 Section xp+146 yp+0", "OK").OnEvent("Click", (*) => dlg.Destroy())
+
+; Display the dialog
+dlg.Show()
+WinWaitClose(dlg)
+
+; ====== Visual Elements Initialization ======
+; Initialize visual elements only after the dialog is dismissed
 InitializeOverlays() ; Create workspace overlay displays - adds visual indicators for workspace numbers
 
+; ====== Start Timers ======
 ; Set up periodic cleanup of window references (every 2 minutes)
 SetTimer(CleanupWindowReferences, 120000)
 
@@ -2337,9 +2498,24 @@ SetTimer(CheckMouseMovement, 100) ; Check every 100ms
 
 ; Function to periodically check mouse position and update active monitor border
 CheckMouseMovement(*) {
+    ; Reference global variables
+    global SCRIPT_EXITING, BORDER_VISIBLE, DEBUG_MODE
+
+    ; Skip if script is exiting
+    if (SCRIPT_EXITING) {
+        if (DEBUG_MODE)
+            LogMessage("Script is exiting, ignoring mouse movement check")
+        return
+    }
+
     ; Only check for active monitor updates when border is visible
     if (BORDER_VISIBLE) {
-        UpdateActiveMonitorBorder()
+        try {
+            UpdateActiveMonitorBorder()
+        } catch Error as err {
+            if (DEBUG_MODE)
+                LogMessage("Error updating active monitor border: " err.Message)
+        }
     }
 }
 

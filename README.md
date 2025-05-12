@@ -69,6 +69,16 @@ BORDER_COLOR := "33FFFF"  ; Color of active monitor border
 BORDER_THICKNESS := 3   ; Thickness of monitor border in pixels
 ```
 
+## Bugs
+
+- backtick overlay not updating
+- many transient crash messages on completion
+
+## Feature Requests
+
+- system tray icon
+- system tray right-click configuration menu
+
 ## Troubleshooting
 
 If you encounter issues with Cerberus:

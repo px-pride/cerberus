@@ -2319,7 +2319,7 @@ MsgBox("Cerberus Workspace Manager starting..."
       "`nPress Ctrl+Shift+1 through Ctrl+Shift+9 to send active window to workspace"
       "`nPress Ctrl+0 to toggle workspace number overlays and monitor border"
       "`nPress Ctrl+` to toggle window assignments overlay"
-      "`nActive monitor (based on mouse position) is highlighted with a border", "Cerberus", "T5") ; Shows startup message with key bindings, T5 means timeout after 5 seconds
+      "`nActive monitor (based on mouse position) is highlighted with a border", "Cerberus") ; Shows startup message with key bindings
 
 CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
 SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations

@@ -2313,13 +2313,13 @@ global LAST_ACTIVE_MONITOR := 0 ; Tracks the last known active monitor
 
 ; ====== Initialization ======
 ; Create a simple message box to indicate script has started
-MsgBox("Cerberus Workspace Manager starting..."
-      "`nPress OK to continue"
+MsgBox("Cerberus Instructions:"
       "`nPress Ctrl+1 through Ctrl+9 to switch workspaces"
-      "`nPress Ctrl+Shift+1 through Ctrl+Shift+9 to send active window to workspace"
+      "`nPress Ctrl+Shift+[Number] to send active window to specific workspace"
       "`nPress Ctrl+0 to toggle workspace number overlays and monitor border"
       "`nPress Ctrl+` to toggle window assignments overlay"
-      "`nActive monitor (based on mouse position) is highlighted with a border", "Cerberus") ; Shows startup message with key bindings
+      "`nActive monitor (based on mouse position) is highlighted with a border"
+      "`nPress OK to continue", "Cerberus") ; Shows startup message with key bindings
 
 CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
 SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations

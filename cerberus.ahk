@@ -2536,6 +2536,7 @@ global SHOW_TRAY_NOTIFICATIONS := False  ; Set to True to show tray notification
 ; Flag to prevent recursive workspace switching and handler execution
 global SWITCH_IN_PROGRESS := False
 ; Flag to indicate script is exiting - handlers should check this and return immediately
+; Global variable to prevent event handlers from running during script termination
 global SCRIPT_EXITING := False
 
 ; Monitor workspace assignments (monitor index → workspace ID)
@@ -2567,7 +2568,7 @@ global LAST_ACTIVE_MONITOR := 0 ; Tracks the last known active monitor
 OnExit(ExitHandler)
 
 ExitHandler(ExitReason, ExitCode) {
-    global DEBUG_MODE, SCRIPT_EXITING
+    global DEBUG_MODE, SCRIPT_EXITING, WorkspaceOverlays, WindowListOverlay, WindowListVisible
 
     ; Set flag to prevent handlers from running during exit
     SCRIPT_EXITING := True
@@ -2579,14 +2580,59 @@ ExitHandler(ExitReason, ExitCode) {
     SetTimer(CleanupWindowReferences, 0)
     SetTimer(CheckMouseMovement, 0)
     SetTimer(PeriodicOverlayUpdate, 0)
-
+    
+    ; Clean up workspace overlays
+    try {
+        for monitorIndex, overlay in WorkspaceOverlays {
+            if (overlay && overlay.HasProp("Hwnd") && WinExist("ahk_id " overlay.Hwnd)) {
+                overlay.Destroy()
+            }
+        }
+        WorkspaceOverlays := Map()
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Error cleaning up workspace overlays: " err.Message)
+    }
+    
+    ; Clean up window list overlay
+    try {
+        if (WindowListOverlay && WindowListOverlay.HasProp("Hwnd") && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
+            WindowListOverlay.Destroy()
+            WindowListOverlay := ""
+            WindowListVisible := false
+        }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Error cleaning up window list overlay: " err.Message)
+    }
+    
     ; Remove message hooks
     OnMessage(0x0003, WindowMoveResizeHandler, 0)  ; WM_MOVE
     OnMessage(0x0005, WindowMoveResizeHandler, 0)  ; WM_SIZE
     OnMessage(0x0001, NewWindowHandler, 0)         ; WM_CREATE
     OnMessage(0x0002, WindowCloseHandler, 0)       ; WM_DESTROY
-
-    ; Destroy GUI elements safely
+    
+    ; Clean up any open tool tips
+    ToolTip()
+    
+    ; Clean up static maps in handlers to prevent memory leaks
+    try {
+        ; Clean global maps to release references to window handles
+        WindowWorkspaces := Map()
+        WorkspaceLayouts := Map()
+        
+        ; Clear any remaining handler static variables if possible
+        if (ObjHasOwnProp(WindowMoveResizeHandler, "lastWindowState")) {
+            WindowMoveResizeHandler.lastWindowState := Map()
+        }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Error cleaning up handler static variables: " err.Message)
+    }
+    
+    ; Log successful exit
+    if (DEBUG_MODE)
+        LogMessage("Successfully cleaned up resources, script terminating cleanly")
     try {
         ; Hide all workspace overlays
         for monitorIndex, overlay in WorkspaceOverlays {

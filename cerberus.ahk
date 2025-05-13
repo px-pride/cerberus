@@ -279,8 +279,8 @@ GetActiveMonitor() { ; Gets the monitor index where the mouse cursor is located
         ; Get mouse cursor position
         MouseGetPos(&mouseX, &mouseY)
 
-        if (DEBUG_MODE)
-            LogMessage("Getting active monitor for mouse position: " mouseX ", " mouseY)
+        ;if (DEBUG_MODE)
+            ;LogMessage("Getting active monitor for mouse position: " mouseX ", " mouseY)
 
         ; Find which monitor contains the mouse cursor
         monitorCount := MonitorGetCount()
@@ -297,6 +297,72 @@ GetActiveMonitor() { ; Gets the monitor index where the mouse cursor is located
         if (DEBUG_MODE)
             LogMessage("Error in GetActiveMonitor: " err.Message)
         return 1  ; Default to primary monitor on any error
+    }
+}
+
+; Convert absolute window position to relative position (as percentage of monitor)
+AbsoluteToRelativePosition(x, y, width, height, monitorIndex) {
+    try {
+        ; Get monitor dimensions
+        MonitorGetWorkArea(monitorIndex, &mLeft, &mTop, &mRight, &mBottom)
+        monitorWidth := mRight - mLeft
+        monitorHeight := mBottom - mTop
+        
+        ; Calculate relative positions as percentages
+        relX := (x - mLeft) / monitorWidth
+        relY := (y - mTop) / monitorHeight
+        relWidth := width / monitorWidth
+        relHeight := height / monitorHeight
+        
+        return {
+            relX: relX,
+            relY: relY,
+            relWidth: relWidth,
+            relHeight: relHeight,
+            monitorIndex: monitorIndex
+        }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Error in AbsoluteToRelativePosition: " err.Message)
+        return {
+            relX: 0,
+            relY: 0,
+            relWidth: 0.5,
+            relHeight: 0.5,
+            monitorIndex: monitorIndex
+        }
+    }
+}
+
+; Convert relative window position to absolute position based on current monitor dimensions
+RelativeToAbsolutePosition(relX, relY, relWidth, relHeight, monitorIndex) {
+    try {
+        ; Get current monitor dimensions
+        MonitorGetWorkArea(monitorIndex, &mLeft, &mTop, &mRight, &mBottom)
+        monitorWidth := mRight - mLeft
+        monitorHeight := mBottom - mTop
+        
+        ; Calculate absolute positions
+        x := mLeft + (relX * monitorWidth)
+        y := mTop + (relY * monitorHeight)
+        width := relWidth * monitorWidth
+        height := relHeight * monitorHeight
+        
+        return {
+            x: Round(x),
+            y: Round(y),
+            width: Round(width),
+            height: Round(height)
+        }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Error in RelativeToAbsolutePosition: " err.Message)
+        return {
+            x: mLeft,
+            y: mTop,
+            width: monitorWidth // 2,
+            height: monitorHeight // 2
+        }
     }
 }
 
@@ -339,6 +405,12 @@ SaveWindowLayout(hwnd, workspaceID) { ; Stores window position and state for lat
                     LogMessage("SaveWindowLayout: Invalid position values for window " hwnd)
                 return ; Skip saving if we get invalid position values
             }
+            
+            ; Get monitor index for this window
+            monitorIndex := GetWindowMonitorIndex(hwnd)
+            
+            ; Convert to relative position
+            relativePos := AbsoluteToRelativePosition(x, y, width, height, monitorIndex)
 
             ; Get window state with error handling
             try {
@@ -351,12 +423,17 @@ SaveWindowLayout(hwnd, workspaceID) { ; Stores window position and state for lat
                 isMaximized := false
             }
 
-            ; Store window layout
+            ; Store window layout with both absolute and relative positions
             WorkspaceLayouts[workspaceID][hwnd] := { ; Creates layout object for this window
                 x: x,
                 y: y,
                 width: width,
                 height: height,
+                relX: relativePos.relX,
+                relY: relativePos.relY,
+                relWidth: relativePos.relWidth,
+                relHeight: relativePos.relHeight,
+                monitorIndex: monitorIndex,
                 isMinimized: isMinimized,
                 isMaximized: isMaximized
             }
@@ -416,8 +493,19 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
 
             if (layouts.Has(hwnd)) {
                 layout := layouts[hwnd]
-                if (DEBUG_MODE)
-                    LogMessage("Found saved layout for window: x=" layout.x ", y=" layout.y ", w=" layout.width ", h=" layout.height)
+                
+                ; Get current monitor index for this window
+                currentMonitorIndex := GetWindowMonitorIndex(hwnd)
+                
+                ; If current monitor is different from saved monitor, we'll use relative positioning
+                useRelativePositioning := currentMonitorIndex != layout.monitorIndex
+                
+                if (DEBUG_MODE) {
+                    if (useRelativePositioning)
+                        LogMessage("Monitor changed: Original=" layout.monitorIndex ", Current=" currentMonitorIndex ". Using relative positioning.")
+                    else
+                        LogMessage("Found saved layout for window: x=" layout.x ", y=" layout.y ", w=" layout.width ", h=" layout.height)
+                }
 
                 ; Apply saved layout
                 if (layout.isMaximized) { ; If window was previously maximized
@@ -444,6 +532,27 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
                         if (DEBUG_MODE)
                             LogMessage("Moving window to saved position")
 
+                        ; If monitor has changed, calculate new absolute position based on relative values
+                        if (useRelativePositioning) {
+                            ; Convert relative position to absolute for current monitor
+                            absolutePos := RelativeToAbsolutePosition(
+                                layout.relX, layout.relY, layout.relWidth, layout.relHeight, currentMonitorIndex)
+                            
+                            x := absolutePos.x
+                            y := absolutePos.y
+                            width := absolutePos.width
+                            height := absolutePos.height
+                            
+                            if (DEBUG_MODE)
+                                LogMessage("Using relative position: new x=" x ", y=" y ", w=" width ", h=" height)
+                        } else {
+                            ; Use original absolute position
+                            x := layout.x
+                            y := layout.y
+                            width := layout.width
+                            height := layout.height
+                        }
+
                         ; Ensure coordinates are within screen bounds
                         monitorCount := MonitorGetCount()
                         coordsValid := false
@@ -451,15 +560,15 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
                         ; Check if coordinates are within any monitor's bounds
                         loop monitorCount {
                             MonitorGetWorkArea(A_Index, &mLeft, &mTop, &mRight, &mBottom)
-                            if (layout.x >= mLeft - layout.width && layout.x <= mRight &&
-                                layout.y >= mTop - layout.height && layout.y <= mBottom) {
+                            if (x >= mLeft - width && x <= mRight &&
+                                y >= mTop - height && y <= mBottom) {
                                 coordsValid := true
                                 break
                             }
                         }
 
                         if (coordsValid) {
-                            WinMove(layout.x, layout.y, layout.width, layout.height, "ahk_id " hwnd)
+                            WinMove(x, y, width, height, "ahk_id " hwnd)
                         } else {
                             if (DEBUG_MODE)
                                 LogMessage("Window position out of bounds, using default position")
@@ -644,6 +753,8 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
 
             ; Get target monitor dimensions
             MonitorGetWorkArea(targetMonitor, &mLeft, &mTop, &mRight, &mBottom)
+            if (DEBUG_MODE)
+                LogMessage(mTop " " mLeft " " mBottom " " mRight)
 
             ; Get current window position and size
             try {
@@ -671,13 +782,46 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
                 y := 0
             }
 
-            ; Calculate new position to center window on target monitor
-            newX := mLeft + (mRight - mLeft - width) / 2
-            newY := mTop + (mBottom - mTop - height) / 2
+            ; Get the source monitor for the window
+            sourceMonitorIndex := GetWindowMonitorIndex(activeHwnd)
+            
+            ; Calculate position based on whether we've seen this window before
+            if (WindowWorkspaces.Has(activeHwnd) && WorkspaceLayouts.Has(WindowWorkspaces[activeHwnd]) && 
+                WorkspaceLayouts[WindowWorkspaces[activeHwnd]].Has(activeHwnd)) {
+                
+                ; Get existing layout data with relative positioning
+                existingWorkspaceID := WindowWorkspaces[activeHwnd]
+                existingLayout := WorkspaceLayouts[existingWorkspaceID][activeHwnd]
+                
+                if (DEBUG_MODE)
+                    LogMessage("Found existing layout data for window, using relative positioning")
+                
+                ; Use relative positioning to calculate new position on target monitor
+                absolutePos := RelativeToAbsolutePosition(
+                    existingLayout.relX, existingLayout.relY, existingLayout.relWidth, existingLayout.relHeight, targetMonitor)
+                
+                newX := absolutePos.x
+                newY := absolutePos.y
+                newWidth := absolutePos.width
+                newHeight := absolutePos.height
+                if (DEBUG_MODE)
+                    LogMessage(absolutePos.x " " absolutePos.y " " absolutePos.width " " absolutePos.height)
+                if (DEBUG_MODE)
+                    LogMessage("Using relative position: new x=" newX ", y=" newY ", w=" newWidth ", h=" newHeight)
+            } else {
+                ; No previous layout data - center window on monitor
+                if (DEBUG_MODE)
+                    LogMessage("No existing layout data, centering window on monitor")
+                
+                newX := mLeft + (mRight - mLeft - width) / 2
+                newY := mTop + (mBottom - mTop - height) / 2
+                newWidth := width
+                newHeight := height
+            }
 
             ; Move the window to target monitor
             try {
-                WinMove(newX, newY, width, height, "ahk_id " activeHwnd)
+                WinMove(newX, newY, newWidth, newHeight, "ahk_id " activeHwnd)
             } catch Error as err {
                 if (DEBUG_MODE)
                     LogMessage("SendWindowToWorkspace: Error moving window: " err.Message)
@@ -1063,13 +1207,16 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                     if (DEBUG_MODE)
                         LogMessage("RESTORING window for workspace " requestedID ": " title)
 
-                    ; Force window restore - the WindowMoveResizeHandler will handle workspace assignment
+                    ; Use the proper RestoreWindowLayout function to restore window using saved layout
                     try {
-                        ; Restore from minimized state if needed
+                        ; First restore from minimized state if needed
                         if (winState = -1) {
                             WinRestore("ahk_id " hwnd)
                             Sleep(30) ; Allow time for the restore operation to complete
                         }
+                        
+                        ; Now use saved layout data to restore the window properly
+                        RestoreWindowLayout(hwnd, requestedID)
 
                         ; Verify window is on the correct monitor even if it was already restored
                         try {
@@ -1321,6 +1468,24 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
         ; Get current monitor and workspace assignment
         windowMonitor := GetWindowMonitor(hwnd)
 
+        ; Track monitor changes for relative positioning
+        static lastWindowMonitor := Map()
+        monitorChanged := false
+        
+        ; Initialize if needed
+        if (!lastWindowMonitor.Has(hwnd))
+            lastWindowMonitor[hwnd] := windowMonitor
+            
+        ; Check if monitor has changed
+        if (lastWindowMonitor[hwnd] != windowMonitor) {
+            monitorChanged := true
+            if (DEBUG_MODE)
+                LogMessage("Window moved to different monitor: " lastWindowMonitor[hwnd] " -> " windowMonitor)
+            
+            ; Update stored monitor
+            lastWindowMonitor[hwnd] := windowMonitor
+        }
+
         if (MonitorWorkspaces.Has(windowMonitor)) {
             currentMonitorWorkspace := MonitorWorkspaces[windowMonitor]
 
@@ -1341,8 +1506,13 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
     ; Save layout if window has a valid workspace assignment
     if (WindowWorkspaces.Has(hwnd)) {
         workspaceID := WindowWorkspaces[hwnd]
-        if (workspaceID > 0)
+        if (workspaceID > 0) {
+            ; Save layout with relative positioning
             SaveWindowLayout(hwnd, workspaceID)
+            
+            if (DEBUG_MODE && monitorChanged)
+                LogMessage("Updated window layout with relative positioning due to monitor change")
+        }
     }
 }
 
@@ -1617,6 +1787,12 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
 
                 ; Window already has workspace assignment, but may need updating if it moved monitors
                 currentWorkspaceID := WindowWorkspaces[hwnd]
+                
+                ; IMPORTANT: Always save the layout, even for existing windows
+                ; This ensures we always have layout data for relative positioning
+                SaveWindowLayout(hwnd, currentWorkspaceID)
+                if (DEBUG_MODE)
+                    LogMessage("Updated layout for existing window in workspace " currentWorkspaceID)
 
                 ; If window's current workspace doesn't match its monitor's workspace, update it
                 if (currentWorkspaceID != workspaceID) {
@@ -2053,8 +2229,8 @@ ShowMonitorBorder(monitorIndex) { ; Shows the border for a specific monitor
                 gui.Show("NoActivate")
             }
 
-            if (DEBUG_MODE)
-                LogMessage("Showed border for monitor " monitorIndex)
+            ;if (DEBUG_MODE)
+                ;LogMessage("Showed border for monitor " monitorIndex)
         }
     } catch Error as err {
         if (DEBUG_MODE)
@@ -2469,17 +2645,17 @@ dlg.Title := "Cerberus"
 
 ; Add the information text with exact same formatting as the MsgBox
 dlg.SetFont("s9", "Segoe UI")
-dlg.Add("Text", "w372", "Cerberus Instructions:")
-dlg.Add("Text", "w372 y+0", "Press Ctrl+1 through Ctrl+9 to switch workspaces")
-dlg.Add("Text", "w372 y+0", "Press Ctrl+Shift+[Number] to send active window to specific workspace")
-dlg.Add("Text", "w372 y+0", "Press Ctrl+0 to toggle workspace number overlays and monitor border")
-dlg.Add("Text", "w372 y+0", "Press Ctrl+` to toggle window assignments overlay")
-dlg.Add("Text", "w372 y+0", "Active monitor (based on mouse position) is highlighted with a border")
-dlg.Add("Text", "w372 y+0", "Press OK to continue")
+dlg.Add("Text", "w382", "Cerberus Instructions:")
+dlg.Add("Text", "w382 y+0", "Press Ctrl+1 through Ctrl+9 to switch workspaces.")
+dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send active window to specific workspace.")
+dlg.Add("Text", "w382 y+0", "Press Ctrl+0 to toggle workspace number overlays and monitor border.")
+dlg.Add("Text", "w382 y+0", "Press Ctrl+` to toggle window assignments overlay.")
+dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
+dlg.Add("Text", "w382 y+0", "Press OK to continue.")
 
 ; Use a simpler way to center the button with a container
-buttonContainer := dlg.Add("Text", "w372 h1 Center y+15") ; Invisible container for centering
-dlg.Add("Button", "Default w80 Section xp+146 yp+0", "OK").OnEvent("Click", (*) => dlg.Destroy())
+buttonContainer := dlg.Add("Text", "w382 h1 Center y+15") ; Invisible container for centering
+dlg.Add("Button", "Default w80 Section xp+151 yp+0", "OK").OnEvent("Click", (*) => dlg.Destroy())
 
 ; Display the dialog
 dlg.Show()

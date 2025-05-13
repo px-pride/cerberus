@@ -1,9 +1,10 @@
 # Ignore all files
 *
 
-# Except for markdown and AutoHotkey files
+# Except for markdown, AutoHotkey, and icon files
 !*.md
 !*.ahk
+!*.ico
 
 # Don't ignore .gitignore
 !.gitignore

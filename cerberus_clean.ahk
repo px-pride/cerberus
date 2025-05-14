@@ -670,34 +670,6 @@ LogMessage(message) {
 ; ----- Event Handlers -----
 
 ; Helper function for delayed window checking
-DelayedWindowCheck(hwnd, *) {
-    ; Reference global variables
-    global SCRIPT_EXITING, DEBUG_MODE
-
-    ; Skip if script is exiting
-    if (SCRIPT_EXITING) {
-        if (DEBUG_MODE)
-            LogMessage("Script is exiting, ignoring delayed window check")
-        return
-    }
-
-    ; Only call AssignNewWindow if window is still valid
-    try {
-        ; More careful check for window existence to avoid errors
-        try {
-            if (WinExist("ahk_id " hwnd))
-                AssignNewWindow(hwnd)
-            else if (DEBUG_MODE)
-                LogMessage("Skipping delayed assignment for window " hwnd " - no longer exists")
-        } catch Error as existErr {
-            if (DEBUG_MODE)
-                LogMessage("Error checking window existence in DelayedWindowCheck: " existErr.Message)
-        }
-    } catch Error as err {
-        if (DEBUG_MODE)
-            LogMessage("Error in delayed window assignment timer: " err.Message)
-    }
-}
 SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified workspace
     ; Reference global variables
     global SWITCH_IN_PROGRESS, DEBUG_MODE, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
@@ -849,14 +821,7 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
             SaveWindowLayout(activeHwnd, targetWorkspaceID)
         }
 
-
-        if (DEBUG_MODE)
-            LogMessage("Window successfully assigned to workspace " targetWorkspaceID)
-
-        if (DEBUG_MODE)
-            LogMessage("------------- SEND WINDOW TO WORKSPACE END -------------")
-    } catch Error as err {
-        if (DEBUG_MODE)
+                if (DEBUG_MODE)
             LogMessage("ERROR in SendWindowToWorkspace: " err.Message)
     } finally {
         ; Always clear the switch in progress flag
@@ -967,78 +932,6 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
             MonitorWorkspaces[otherMonitor] := currentWorkspaceID
             MonitorWorkspaces[activeMonitor] := requestedID
 
-            ; Update overlays immediately after changing workspace IDs
-            UpdateAllOverlays()
-            
-            ; Step 2: Move windows from active monitor to other monitor
-            for index, hwnd in activeMonitorWindows {
-                try {
-                    ; Get window position and state
-                    WinGetPos(&x, &y, &width, &height, hwnd)
-                    isMaximized := WinGetMinMax(hwnd) = 1
-                    
-                    if (DEBUG_MODE) {
-                        title := WinGetTitle(hwnd)
-                        LogMessage("Moving window from active to other monitor: " title)
-                    }
-
-                    ; Move window, preserving layout
-                    if (isMaximized) {
-                        ; First restore to normal, move, then maximize again
-                        if (WinGetMinMax(hwnd) = 1)
-                            WinRestore("ahk_id " hwnd)
-
-                        ; Move to new position
-                        WinMove(x - offsetX, y - offsetY, width, height, "ahk_id " hwnd)
-
-                        ; Verify the window was moved to the correct monitor
-                        Sleep(30) ; Allow time for the move operation to complete
-                        currMonitor := GetWindowMonitor(hwnd)
-
-                        if (currMonitor != otherMonitor) {
-                            ; Recalculate position in other monitor
-                            MonitorGetWorkArea(otherMonitor, &mLeft, &mTop, &mRight, &mBottom)
-                            centerX := mLeft + (mRight - mLeft - width) / 2
-                            centerY := mTop + (mBottom - mTop - height) / 2
-
-                            ; Force window to other monitor
-                            WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
-
-                            if (DEBUG_MODE)
-                                LogMessage("CORRECTED position to ensure window is on other monitor: " title)
-                        }
-
-                        ; Maximize again
-                        WinMaximize("ahk_id " hwnd)
-                    } else {
-                        ; For non-maximized windows, just move them
-                        WinMove(x - offsetX, y - offsetY, width, height, "ahk_id " hwnd)
-
-                        ; Verify the window was moved to the correct monitor
-                        Sleep(30) ; Allow time for the move operation to complete
-                        currMonitor := GetWindowMonitor(hwnd)
-
-                        if (currMonitor != otherMonitor) {
-                            ; Recalculate position in other monitor
-                            MonitorGetWorkArea(otherMonitor, &mLeft, &mTop, &mRight, &mBottom)
-                            centerX := mLeft + (mRight - mLeft - width) / 2
-                            centerY := mTop + (mBottom - mTop - height) / 2
-
-                            ; Force window to other monitor
-                            WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
-
-                            if (DEBUG_MODE)
-                                LogMessage("CORRECTED position to ensure window is on other monitor: " title)
-                        }
-                    }
-                    
-                    Sleep(30) ; Short delay to prevent overwhelming the system
-                } catch Error as err {
-                    if (DEBUG_MODE)
-                        LogMessage("ERROR moving window: " err.Message)
-                }
-            }
-            
             ; Step 3: Move windows from other monitor to active monitor
             for index, hwnd in otherMonitorWindows {
                 try {
@@ -1156,110 +1049,6 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
             if (DEBUG_MODE)
                 LogMessage("Changed active monitor workspace to: " requestedID)
 
-            ; Update overlays immediately after changing workspace ID
-            UpdateAllOverlays()
-
-            ; Force a delay to allow minimizations to complete
-            Sleep(300)
-
-            ; ====== STEP 3: Restore windows belonging to requested workspace ======
-            restoreCount := 0
-
-            ; Get all windows again (in case things changed)
-            windows := WinGetList()
-
-            ; Process each window
-            for index, hwnd in windows {
-                ; Skip invalid windows
-                if (!IsWindowValid(hwnd))
-                    continue
-
-                ; Get window info
-                title := WinGetTitle(hwnd)
-                windowMonitor := GetWindowMonitor(hwnd)
-                winState := WinGetMinMax(hwnd)
-
-                ; Check if window belongs to the requested workspace
-                workspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
-
-                if (workspaceID = requestedID) {
-                    ; This is a window that belongs to the requested workspace
-
-                    ; Move it to the active monitor if it's not already there
-                    if (windowMonitor != activeMonitor) {
-                        ; Get monitor dimensions
-                        MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
-
-                        ; Get window size
-                        WinGetPos(&x, &y, &width, &height, "ahk_id " hwnd)
-
-                        ; Center window on active monitor
-                        newX := mLeft + (mRight - mLeft - width) / 2
-                        newY := mTop + (mBottom - mTop - height) / 2
-
-                        ; Move window to active monitor
-                        WinMove(newX, newY, width, height, "ahk_id " hwnd)
-
-                        if (DEBUG_MODE)
-                            LogMessage("MOVING window from monitor " windowMonitor " to active monitor " activeMonitor ": " title)
-                    }
-
-                    if (DEBUG_MODE)
-                        LogMessage("RESTORING window for workspace " requestedID ": " title)
-
-                    ; Use the proper RestoreWindowLayout function to restore window using saved layout
-                    try {
-                        ; First restore from minimized state if needed
-                        if (winState = -1) {
-                            WinRestore("ahk_id " hwnd)
-                            Sleep(30) ; Allow time for the restore operation to complete
-                        }
-                        
-                        ; Now use saved layout data to restore the window properly
-                        RestoreWindowLayout(hwnd, requestedID)
-
-                        ; Verify window is on the correct monitor even if it was already restored
-                        try {
-                            ; Get current window position after restore
-                            WinGetPos(&currX, &currY, &currWidth, &currHeight, "ahk_id " hwnd)
-
-                            ; Get current window monitor
-                            currMonitor := GetWindowMonitor(hwnd)
-
-                            ; Check if window needs to be moved to the active monitor
-                            if (currMonitor != activeMonitor) {
-                                ; Get active monitor dimensions
-                                MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
-
-                                ; Calculate new position to center window on active monitor
-                                newX := mLeft + (mRight - mLeft - currWidth) / 2
-                                newY := mTop + (mBottom - mTop - currHeight) / 2
-
-                                ; Move window to active monitor
-                                WinMove(newX, newY, currWidth, currHeight, "ahk_id " hwnd)
-
-                                if (DEBUG_MODE)
-                                    LogMessage("MOVED restored window to active monitor: " title)
-
-                                Sleep(30) ; Allow time for the move operation to complete
-                            }
-                        } catch Error as moveErr {
-                            if (DEBUG_MODE)
-                                LogMessage("ERROR moving window to correct monitor: " moveErr.Message)
-                        }
-
-                        ; Note: WindowWorkspaces is now updated by event handlers, not directly here
-                        SaveWindowLayout(hwnd, requestedID)
-
-                        restoreCount++
-                        Sleep(30) ; Delay to allow operations to complete
-                    } catch Error as err {
-                        if (DEBUG_MODE)
-                            LogMessage("ERROR restoring window: " err.Message)
-                    }
-                }
-            }
-
             if (DEBUG_MODE)
                 LogMessage("Restored " restoreCount " windows for workspace " requestedID)
         }
@@ -1272,19 +1061,6 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     finally {
         ; Always update overlays to ensure they reflect the current workspace state,
         ; even if there was an error or early return in the switch logic
-        UpdateAllOverlays()
-
-        ; Log workspace window contents AFTER the switch
-        if (DEBUG_MODE)
-            LogWorkspaceWindowContents("AFTER SWITCH:")
-
-        ; Log that the workspace switch is complete
-        if (DEBUG_MODE)
-            LogMessage("------------- WORKSPACE SWITCH END -------------")
-
-        ; Always clear the switch in progress flag, even if there was an error
-        SWITCH_IN_PROGRESS := False
-    }
 }
 ; Clean up stale window references to prevent memory leaks
 CleanupWindowReferences() {
@@ -1315,120 +1091,61 @@ CleanupWindowReferences() {
 
     ; Clean up WorkspaceLayouts map
     layoutTotalStaleCount := 0
-    for workspaceID, layoutMap in WorkspaceLayouts {
+    for workspaceID, layouts in WorkspaceLayouts {
         layoutStaleCount := 0
-        for hwnd, layout in layoutMap {
+        for hwnd, layout in layouts {
             try {
                 if !WinExist(hwnd) {
-                    layoutMap.Delete(hwnd)
+                    layouts.Delete(hwnd)
                     layoutStaleCount++
                 }
             } catch Error as err {
                 ; If there's an error, remove this reference anyway
-                layoutMap.Delete(hwnd)
+                layouts.Delete(hwnd)
                 layoutStaleCount++
             }
         }
-        if (layoutStaleCount > 0 && DEBUG_MODE) {
-            LogMessage("Cleaned up " layoutStaleCount " stale layout entries for workspace " workspaceID)
-            layoutTotalStaleCount += layoutStaleCount
+        layoutTotalStaleCount += layoutStaleCount
+    }
+
+    if ((workspaceStaleCount > 0 || layoutTotalStaleCount > 0) && DEBUG_MODE) {
+        LogMessage("Cleaned up " workspaceStaleCount " workspace entries and " layoutTotalStaleCount " layout entries")
+    }
+} catch Error as err {
+                    ; If there's an error, remove this reference anyway
+                    lastStateMap.Delete(hwnd)
+                    staleCount++
+                }
+            }
         }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Info: Skipping lastWindowState cleanup - not initialized yet")
     }
     
-    if ((workspaceStaleCount > 0 || layoutTotalStaleCount > 0) && DEBUG_MODE) {
-        LogMessage("Cleaned up " workspaceStaleCount " workspace entries, and " layoutTotalStaleCount " layout entries")
+    ; Clean up WindowWorkspaces map
+    workspaceStaleCount := 0
+    for hwnd, workspaceID in WindowWorkspaces {
+        try {
+            if !WinExist(hwnd) {
+                WindowWorkspaces.Delete(hwnd)
+                workspaceStaleCount++
+            }
+        } catch Error as err {
+            ; If there's an error, remove this reference anyway
+            WindowWorkspaces.Delete(hwnd)
+            workspaceStaleCount++
+        }
+    }
+
+    ; If any windows were removed and the count is significant, update the overlay
+    if (workspaceStaleCount > 0) {
+    
+    if ((staleCount > 0 || workspaceStaleCount > 0 || layoutTotalStaleCount > 0) && DEBUG_MODE) {
+        LogMessage("Cleaned up " staleCount " window state entries, " workspaceStaleCount " workspace entries, and " layoutTotalStaleCount " layout entries")
     }
 }
 
-AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed follow-up check)
-    ; Reference global variables
-    global DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces
-
-    ; Validate the hwnd parameter
-    try {
-        if (!hwnd || hwnd = 0) {
-            if (DEBUG_MODE)
-                LogMessage("AssignNewWindow: Invalid window handle (null or zero)")
-            return
-        }
-    } catch Error as err {
-        if (DEBUG_MODE)
-            LogMessage("AssignNewWindow: Error validating handle parameter: " err.Message)
-        return
-    }
-
-    ; Verify window still exists
-    try {
-        if (!WinExist("ahk_id " hwnd)) {
-            if (DEBUG_MODE)
-                LogMessage("AssignNewWindow: Window " hwnd " no longer exists")
-            return
-        }
-    } catch Error as existErr {
-        if (DEBUG_MODE)
-            LogMessage("AssignNewWindow: Error checking window existence: " existErr.Message)
-        return
-    }
-
-    ; Check again if the window exists and is valid - it might have closed already
-    if (!IsWindowValid(hwnd)) {
-        if (DEBUG_MODE)
-            LogMessage("AssignNewWindow: Window " hwnd " is not valid")
-        return
-    }
-
-    ; Get window info safely
-    try {
-        title := WinGetTitle("ahk_id " hwnd)
-        class := WinGetClass("ahk_id " hwnd)
-
-        if (DEBUG_MODE)
-            LogMessage("Follow-up check for window - Title: " title ", Class: " class ", hwnd: " hwnd)
-    } catch Error as err {
-        if (DEBUG_MODE)
-            LogMessage("Error getting window info in delayed check: " err.Message)
-        return
-    }
-
-    ; Check the window's current monitor (it may have moved since initial creation)
-    try {
-        monitorIndex := GetWindowMonitor(hwnd) ; Gets which monitor the window is on now
-        if (DEBUG_MODE)
-            LogMessage("Window is now on monitor: " monitorIndex)
-    } catch Error as err {
-        if (DEBUG_MODE)
-            LogMessage("Error getting window monitor in delayed check: " err.Message)
-        return
-    }
-
-    if (MonitorWorkspaces.Has(monitorIndex)) { ; Checks if monitor has assigned workspace
-        workspaceID := MonitorWorkspaces[monitorIndex] ; Gets workspace ID for this monitor
-
-        ; Check if this window already has a workspace assignment
-        if (!WindowWorkspaces.Has(hwnd)) {
-            try {
-                ; Window was not assigned in initial handler - assign it now
-                WindowWorkspaces[hwnd] := workspaceID ; Assigns window to workspace
-                SaveWindowLayout(hwnd, workspaceID) ; Saves window layout
-                if (DEBUG_MODE)
-                    LogMessage("Window assigned in delayed check to workspace " workspaceID " on monitor " monitorIndex)
-
-                ; Check visibility
-                currentWorkspaceID := MonitorWorkspaces[monitorIndex]
-                if (workspaceID != currentWorkspaceID) {
-                    try {
-                        WinMinimize("ahk_id " hwnd)
-                        if (DEBUG_MODE)
-                            LogMessage("Minimized window belonging to non-visible workspace (delayed check)")
-                    } catch Error as minErr {
-                        if (DEBUG_MODE)
-                            LogMessage("Error minimizing window in delayed check: " minErr.Message)
-                    }
-                }
-            } catch Error as err {
-                if (DEBUG_MODE)
-                    LogMessage("Error assigning window in delayed check: " err.Message)
-            }
         } else {
             try {
                 ; Verify the window still exists again before updating
@@ -1457,23 +1174,6 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
                 if (currentWorkspaceID != workspaceID) {
                     WindowWorkspaces[hwnd] := workspaceID
                     SaveWindowLayout(hwnd, workspaceID)
-                    if (DEBUG_MODE)
-                        LogMessage("Updated window workspace from " currentWorkspaceID " to " workspaceID " (delayed check)")
-
-                    ; Check if it needs to be minimized due to workspace mismatch
-                    currentMonitorWorkspace := MonitorWorkspaces[monitorIndex]
-                    if (workspaceID != currentMonitorWorkspace) {
-                        try {
-                            if (WinGetMinMax("ahk_id " hwnd) != -1) {
-                                WinMinimize("ahk_id " hwnd)
-                                if (DEBUG_MODE)
-                                    LogMessage("Minimized moved window for workspace consistency (delayed check)")
-                            }
-                        } catch Error as minErr {
-                            if (DEBUG_MODE)
-                                LogMessage("Error handling window minimization: " minErr.Message)
-                        }
-                    }
                 }
             } catch Error as err {
                 if (DEBUG_MODE)
@@ -1486,9 +1186,6 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
             ; Verify window still exists
             if (WinExist("ahk_id " hwnd)) {
                 WindowWorkspaces[hwnd] := 0
-                if (DEBUG_MODE)
-                    LogMessage("Assigned window to unassigned workspace (0) - monitor not tracked (delayed check)")
-            }
         } catch Error as err {
             if (DEBUG_MODE)
                 LogMessage("Error assigning window to unassigned workspace: " err.Message)
@@ -1507,20 +1204,6 @@ InitializeOverlays() { ; Creates and displays workspace number indicators and mo
 
     loop monitorCount {
         monitorIndex := A_Index
-        CreateOverlay(monitorIndex) ; Create overlay for this monitor
-    }
-
-    ; Create border overlays for all monitors
-    InitializeMonitorBorders()
-
-    ; Show all overlays initially
-    UpdateAllOverlays() ; Update and show all overlays permanently
-
-    ; Update the active monitor border based on current mouse position
-    UpdateActiveMonitorBorder()
-
-    ; No timer needed as we're using persistent overlays
-}
 
 InitializeMonitorBorders() { ; Creates border overlays for all monitors
     ; Reference global variables
@@ -1601,248 +1284,6 @@ CreateMonitorBorder(monitorIndex, mLeft, mTop, mRight, mBottom) { ; Creates bord
     }
 }
 
-; Function to gather information about which windows are in each workspace
-GetWorkspaceWindowInfo() {
-    ; Reference global variables
-    global WindowWorkspaces, MAX_WORKSPACES, DEBUG_MODE
-
-    if (DEBUG_MODE)
-        LogMessage("Getting fresh window workspace information")
-
-    ; Create a structure to hold window info by workspace
-    windowsByWorkspace := Map()
-
-    ; Initialize map for each workspace
-    loop MAX_WORKSPACES {
-        windowsByWorkspace[A_Index] := []
-    }
-
-    ; Add special category for unassigned windows (workspace 0)
-    windowsByWorkspace[0] := []
-
-    ; Force a check of the window list (ensure we get the most current windows)
-    try {
-        ; Collect all valid windows and group them by workspace
-        windows := WinGetList() ; Get all window handles
-
-        if (DEBUG_MODE)
-            LogMessage("Processing " windows.Length " windows for workspace list")
-
-        windowCount := 0
-
-        for hwnd in windows {
-            ; Skip invalid windows
-            if (!IsWindowValid(hwnd))
-                continue
-
-            ; Get window info
-            title := WinGetTitle(hwnd)
-
-            ; Skip windows with no title
-            if (title = "")
-                continue
-
-            ; Check if window has a workspace assignment
-            workspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
-
-            ; Add window to appropriate workspace list
-            windowsByWorkspace[workspaceID].Push({
-                hwnd: hwnd,
-                title: title
-            })
-
-            windowCount++
-        }
-
-        if (DEBUG_MODE)
-            LogMessage("Added " windowCount " windows to workspace list")
-    } catch Error as err {
-        if (DEBUG_MODE)
-            LogMessage("Error gathering window information: " err.Message)
-    }
-
-    ; Check the window counts for debugging
-    if (DEBUG_MODE) {
-        totalWindows := 0
-        for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] {
-            if (windowsByWorkspace.Has(i)) {
-                count := windowsByWorkspace[i].Length
-                LogMessage("Found " count " windows in workspace " i)
-                totalWindows += count
-            }
-        }
-        LogMessage("Total windows counted: " totalWindows)
-
-        ; Log how many windows are in the WindowWorkspaces map
-        trackedCount := WindowWorkspaces.Count
-        LogMessage("WindowWorkspaces map contains " trackedCount " windows")
-    }
-
-    return windowsByWorkspace
-}
-
-; Function to log detailed workspace window information
-LogWorkspaceWindowContents(prefix := "") {
-    ; Reference global variables
-    global DEBUG_MODE, MAX_WORKSPACES, WindowWorkspaces
-
-    if (!DEBUG_MODE)
-        return
-
-    ; Get window information
-    windowsByWorkspace := GetWorkspaceWindowInfo()
-
-    ; Start log message
-    LogMessage(prefix " ===== WORKSPACE WINDOW CONTENTS =====")
-
-    ; Log each workspace's windows
-    totalWindows := 0
-    for workspaceID in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] {
-        if (workspaceID > MAX_WORKSPACES && workspaceID != 0)
-            continue
-
-        if (windowsByWorkspace.Has(workspaceID)) {
-            windows := windowsByWorkspace[workspaceID]
-
-            ; Log workspace header
-            if (workspaceID = 0)
-                LogMessage(prefix " UNASSIGNED WORKSPACE: " windows.Length " windows")
-            else
-                LogMessage(prefix " WORKSPACE " workspaceID ": " windows.Length " windows")
-
-            ; Log each window in this workspace
-            for index, window in windows {
-                title := window.title
-                hwnd := window.hwnd
-
-                ; Get window state information for more detail
-                try {
-                    isMinimized := WinGetMinMax("ahk_id " hwnd) = -1
-                    isMaximized := WinGetMinMax("ahk_id " hwnd) = 1
-
-                    ; Get monitor info if possible
-                    monitorIndex := GetWindowMonitor(hwnd)
-
-                    ; Create state string
-                    stateStr := isMinimized ? "MINIMIZED" : (isMaximized ? "MAXIMIZED" : "NORMAL")
-
-                    ; Log window details
-                    LogMessage(prefix "   [" index "] hwnd: " hwnd ", title: '" title "', state: " stateStr ", monitor: " monitorIndex)
-                } catch Error as err {
-                    ; Simpler log if error occurs getting details
-                    LogMessage(prefix "   [" index "] hwnd: " hwnd ", title: '" title "', ERROR: " err.Message)
-                }
-            }
-
-            totalWindows += windows.Length
-        } else if (workspaceID != 0) {
-            ; Log empty workspace
-            LogMessage(prefix " WORKSPACE " workspaceID ": 0 windows")
-        }
-    }
-
-    ; Log summary
-    LogMessage(prefix " Total windows: " totalWindows)
-    LogMessage(prefix " ===== END WORKSPACE WINDOW CONTENTS =====")
-}
-
-CreateOverlay(monitorIndex) { ; Creates workspace indicator overlay for specified monitor
-    ; Reference global variables
-    global MonitorWorkspaces, WorkspaceOverlays, OVERLAY_SIZE, OVERLAY_MARGIN, OVERLAY_POSITION, OVERLAY_OPACITY
-
-    ; Get monitor dimensions
-    MonitorGetWorkArea(monitorIndex, &mLeft, &mTop, &mRight, &mBottom) ; Gets coordinates of monitor
-    
-    ; Calculate overlay position based on preference
-    if (OVERLAY_POSITION = "TopLeft") {
-        x := mLeft + OVERLAY_MARGIN
-        y := mTop + OVERLAY_MARGIN
-    } else if (OVERLAY_POSITION = "TopRight") {
-        x := mRight - OVERLAY_SIZE - OVERLAY_MARGIN
-        y := mTop + OVERLAY_MARGIN
-    } else if (OVERLAY_POSITION = "BottomLeft") {
-        x := mLeft + OVERLAY_MARGIN
-        y := mBottom - OVERLAY_SIZE - OVERLAY_MARGIN
-    } else { ; Default to BottomRight
-        x := mRight - OVERLAY_SIZE - OVERLAY_MARGIN
-        y := mBottom - OVERLAY_SIZE - OVERLAY_MARGIN
-    }
-    
-    ; Create GUI for overlay
-    overlay := Gui("+AlwaysOnTop -Caption +ToolWindow +Owner") ; Creates a borderless, always-on-top window
-    overlay.BackColor := "222222" ; Dark gray background
-    
-    ; Add workspace label
-    workspaceID := MonitorWorkspaces.Has(monitorIndex) ? MonitorWorkspaces[monitorIndex] : 0
-    overlay.SetFont("s30 bold", "Arial") ; Increased font size for better visibility
-    ; Calculate better vertical centering - move text down to center it
-    verticalOffset := 8 ; Moderate y-offset for precise vertical centering
-    ; Add text with proper centering (both horizontal and vertical)
-    overlay.Add("Text", "x0 y" verticalOffset " c33FFFF Center vWorkspaceText w" OVERLAY_SIZE " h" OVERLAY_SIZE, workspaceID) ; Adds text label with workspace ID
-    
-    ; Show the overlay first so we can set transparency
-    overlay.Show("x" x " y" y " w" OVERLAY_SIZE " h" OVERLAY_SIZE " NoActivate") ; Shows the overlay
-    
-    ; Set transparency after the window is shown
-    try {
-        WinSetTransparent(OVERLAY_OPACITY, "ahk_id " overlay.Hwnd) ; Sets window transparency
-    } catch Error as err {
-        ; If transparency setting fails, continue without it
-    }
-    
-    ; Store overlay reference
-    WorkspaceOverlays[monitorIndex] := overlay
-    ; Overlay is already shown above
-}
-
-UpdateAllOverlays() { ; Updates all workspace number indicators
-    ; Reference global variables
-    global WorkspaceOverlays
-
-    ; Update and show all overlays
-    for monitorIndex, overlay in WorkspaceOverlays {
-        UpdateOverlay(monitorIndex)
-    }
-
-    ; No timer needed as we're using persistent overlays
-}
-
-UpdateOverlay(monitorIndex) { ; Updates the workspace indicator for specified monitor
-    ; Reference global variables
-    global MonitorWorkspaces, WorkspaceOverlays, OVERLAY_SIZE
-
-    ; Update overlay content to show current workspace ID
-    if (!WorkspaceOverlays.Has(monitorIndex))
-        return
-
-    overlay := WorkspaceOverlays[monitorIndex]
-    workspaceID := MonitorWorkspaces.Has(monitorIndex) ? MonitorWorkspaces[monitorIndex] : 0
-    
-    ; Update the text control by name
-    try {
-        ; Get the text control
-        ctrl := overlay["WorkspaceText"]
-        
-        ; Update the text value
-        ctrl.Value := workspaceID ; Updates the text to current workspace ID
-        
-        ; Ensure proper position - redoing options to maintain vertical centering
-        verticalOffset := 8 ; Match the offset used in CreateOverlay
-        ctrl.Opt("x0 y" verticalOffset " Center w" OVERLAY_SIZE " h" OVERLAY_SIZE)
-    } catch Error as err {
-        ; If control can't be found by name, fall back to first control
-        for ctrl in overlay {
-            ctrl.Value := workspaceID ; Updates the text to current workspace ID
-            verticalOffset := 8 ; Match the offset used in CreateOverlay
-            ctrl.Opt("x0 y" verticalOffset " Center w" OVERLAY_SIZE " h" OVERLAY_SIZE)
-            break ; Only update the first control
-        }
-    }
-    
-    ; Show the overlay
-    overlay.Show("NoActivate") ; Shows the overlay without activating it
-}
-
 HideAllOverlays() { ; Hides all workspace indicators
     ; Reference global variables
     global WorkspaceOverlays
@@ -1863,12 +1304,6 @@ ToggleOverlays() { ; Toggles visibility of workspace indicators
     if (isVisible) {
         HideAllOverlays()
     } else {
-        UpdateAllOverlays()
-
-        ; Reset hide timer if using timeout
-        if (OVERLAY_TIMEOUT > 0) {
-            SetTimer(HideAllOverlays, -OVERLAY_TIMEOUT) ; Sets timer to hide overlays after specified delay
-        }
     }
 
     isVisible := !isVisible
@@ -2086,8 +1521,6 @@ global WorkspaceLayouts := Map()
 ; Workspace overlay GUI handles (monitor index → GUI handle)
 global WorkspaceOverlays := Map()
 ; Workspace window list overlay
-global WindowListOverlay := ""
-global WindowListVisible := false
 ; Active monitor border overlay
 global BorderOverlay := Map()
 global BORDER_VISIBLE := true
@@ -2106,7 +1539,6 @@ global LAST_ACTIVE_MONITOR := 0 ; Tracks the last known active monitor
 OnExit(ExitHandler)
 
 ExitHandler(ExitReason, ExitCode) {
-    global DEBUG_MODE, SCRIPT_EXITING, WorkspaceOverlays, WindowListOverlay, WindowListVisible
 
     ; Set flag to prevent handlers from running during exit
     SCRIPT_EXITING := True
@@ -2117,7 +1549,7 @@ ExitHandler(ExitReason, ExitCode) {
     ; Stop all timers
     SetTimer(CleanupWindowReferences, 0)
     SetTimer(CheckMouseMovement, 0)
-    
+        
     ; Clean up workspace overlays
     try {
         for monitorIndex, overlay in WorkspaceOverlays {
@@ -2133,15 +1565,13 @@ ExitHandler(ExitReason, ExitCode) {
     
     ; Clean up window list overlay
     try {
-        if (WindowListOverlay && WindowListOverlay.HasProp("Hwnd") && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
-            WindowListOverlay.Destroy()
-            WindowListOverlay := ""
-            WindowListVisible := false
         }
     } catch Error as err {
         if (DEBUG_MODE)
             LogMessage("Error cleaning up window list overlay: " err.Message)
     }
+    
+    ; Remove message hooks
     
     ; Clean up any open tool tips
     ToolTip()
@@ -2151,6 +1581,9 @@ ExitHandler(ExitReason, ExitCode) {
         ; Clean global maps to release references to window handles
         WindowWorkspaces := Map()
         WorkspaceLayouts := Map()
+        
+        ; Clear any remaining handler static variables if possible
+        }
     } catch Error as err {
         if (DEBUG_MODE)
             LogMessage("Error cleaning up handler static variables: " err.Message)
@@ -2170,8 +1603,6 @@ ExitHandler(ExitReason, ExitCode) {
         }
 
         ; Hide workspace window list if visible
-        if (WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
-            try WindowListOverlay.Destroy()
             catch Error as err {
                 if (DEBUG_MODE)
                     LogMessage("Error destroying window list overlay: " err.Message)
@@ -2221,7 +1652,7 @@ dlg.Add("Text", "w382", "Cerberus Instructions:")
 dlg.Add("Text", "w382 y+0", "Press Ctrl+1 through Ctrl+9 to switch workspaces.")
 dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send active window to specific workspace.")
 dlg.Add("Text", "w382 y+0", "Press Ctrl+0 to toggle workspace number overlays and monitor border.")
-dlg.Add("Text", "w382 y+0", "Press Ctrl+` to toggle window assignments overlay.")
+
 dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
 dlg.Add("Text", "w382 y+0", "Press OK to continue.")
 
@@ -2301,3 +1732,9 @@ ToggleBordersAndOverlays() {
     ; Toggle monitor borders separately
     ToggleMonitorBorders()
 }
+
+; ====== Register Event Handlers ======
+; Track window move/resize events to update layouts
+; Track new window events to assign to current workspace
+; This event provides an hwnd when a window is created
+; Track window close events to remove windows from tracking

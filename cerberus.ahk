@@ -698,6 +698,7 @@ DelayedWindowCheck(hwnd, *) {
             LogMessage("Error in delayed window assignment timer: " err.Message)
     }
 }
+
 SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified workspace
     ; Reference global variables
     global SWITCH_IN_PROGRESS, DEBUG_MODE, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
@@ -1286,6 +1287,7 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
         SWITCH_IN_PROGRESS := False
     }
 }
+
 ; Clean up stale window references to prevent memory leaks
 CleanupWindowReferences() {
     ; Reference global variables

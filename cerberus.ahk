@@ -2666,10 +2666,10 @@ ExitHandler(ExitReason, ExitCode) {
     }
     
     ; Remove message hooks
-    OnMessage(0x0003, WindowMoveResizeHandler, 1)  ; WM_MOVE (priority 1)
-    OnMessage(0x0005, WindowMoveResizeHandler, 1)  ; WM_SIZE (priority 1)
-    OnMessage(0x0001, NewWindowHandler, 1)         ; WM_CREATE (priority 1)
-    OnMessage(0x0002, WindowCloseHandler, 1)       ; WM_DESTROY (priority 1)
+    OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE
+    OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE
+    OnMessage(0x0001, NewWindowHandler)         ; WM_CREATE
+    OnMessage(0x0002, WindowCloseHandler)       ; WM_DESTROY
     
     ; Clean up any open tool tips
     ToolTip()
@@ -2839,10 +2839,10 @@ ToggleBordersAndOverlays() {
 
 ; ====== Register Event Handlers ======
 ; Track window move/resize events to update layouts
-OnMessage(0x0003, WindowMoveResizeHandler, 1)  ; WM_MOVE - Registers a handler for window move events (priority 1)
-OnMessage(0x0005, WindowMoveResizeHandler, 1)  ; WM_SIZE - Registers a handler for window resize events (priority 1)
+OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE - Registers a handler for window move events
+OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE - Registers a handler for window resize events
 ; Track new window events to assign to current workspace
 ; This event provides an hwnd when a window is created
-OnMessage(0x0001, NewWindowHandler, 1)  ; WM_CREATE - Registers a handler for window creation events (priority 1)
+OnMessage(0x0001, NewWindowHandler)  ; WM_CREATE - Registers a handler for window creation events
 ; Track window close events to remove windows from tracking
-OnMessage(0x0002, WindowCloseHandler, 1)  ; WM_DESTROY - Registers a handler for window destruction events (priority 1)
+OnMessage(0x0002, WindowCloseHandler)  ; WM_DESTROY - Registers a handler for window destruction events

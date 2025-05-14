@@ -7,6 +7,8 @@
 ; Set custom tray icon
 TraySetIcon(A_ScriptDir "\cerberus.ico")
 
+; Removed external include - functionality integrated directly
+
 ; ====== Function Definitions ======
 
 ; ----- Core System Functions -----
@@ -1378,6 +1380,15 @@ CleanupWindowReferences() {
 WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resize events to update saved layouts
     ; Reference global variables
     global SWITCH_IN_PROGRESS, SCRIPT_EXITING, DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
+    LogMessage("WindowMoveResizeHandler called - msg: " msg ", hwnd: " hwnd ", wParam: " wParam ", lParam: " lParam)
+    
+    ; Debug to check if we got the right window handle
+    try {
+        title := WinGetTitle("ahk_id " hwnd)
+        LogMessage("Window title: " title)
+    } catch Error as err {
+        LogMessage("Failed to get window title: " err.Message)
+    }
 
     ; Skip if script is exiting
     if (SCRIPT_EXITING) {
@@ -1514,6 +1525,8 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
                 LogMessage("Updated window layout with relative positioning due to monitor change")
         }
     }
+
+    PeriodicOverlayUpdate()
 }
 
 NewWindowHandler(wParam, lParam, msg, hwnd) { ; Handles window creation events to assign new windows
@@ -2354,42 +2367,8 @@ HideWorkspaceWindowList() {
 
 ; Function for periodic updates of the workspace window overlay
 PeriodicOverlayUpdate(*) {
-    ; Reference global variables
-    global WindowListVisible, WindowListOverlay, SCRIPT_EXITING, DEBUG_MODE
-
-    ; Skip if script is exiting
-    if (SCRIPT_EXITING) {
-        if (DEBUG_MODE)
-            LogMessage("Script is exiting, ignoring overlay update")
-        return
-    }
-
-    if (DEBUG_MODE)
-        LogMessage("Periodic update check for workspace window overlay")
-
-    ; Only proceed if the overlay is visible
-    if (WindowListVisible && WindowListOverlay && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
-        ; Get fresh window information and rebuild the overlay completely
-        if (DEBUG_MODE)
-            LogMessage("Refreshing workspace window overlay with current window state")
-
-        ; Get current window information
-        windowsByWorkspace := GetWorkspaceWindowInfo()
-
-        ; Update the text in the overlay directly without recreating it
-        windowList := BuildWorkspaceWindowText(windowsByWorkspace)
-
-        ; Find the text control and update it
-        try {
-            for ctrl in WindowListOverlay {
-                ctrl.Value := windowList
-                break ; Only update the first control (which is our text control)
-            }
-        } catch Error as err {
-            if (DEBUG_MODE)
-                LogMessage("Error updating overlay text: " err.Message)
-        }
-    }
+    ShowWorkspaceWindowList()
+    ShowWorkspaceWindowList()
 }
 
 ; Function to update the workspace window overlay if it's visible
@@ -2450,7 +2429,7 @@ ShowWorkspaceWindowOverlay() {
     WinSetTransparent(225, "ahk_id " listGui.Hwnd)
 
     ; Set up a timer for periodic updates (every 2 seconds)
-    SetTimer(PeriodicOverlayUpdate, 2000)
+    ;SetTimer(PeriodicOverlayUpdate, 2000)
 
     if (DEBUG_MODE)
         LogMessage("Workspace window overlay created/updated")
@@ -2522,6 +2501,86 @@ BuildWorkspaceWindowText(windowsByWorkspace) {
 ; ====== Configuration ======
 MAX_WORKSPACES := 9  ; Maximum number of workspaces (1-9)
 MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
+
+; ====== Additional Window Handling Functions ======
+; Functions from window_monitor_fix.ahk integrated directly
+
+HandleNewWindow(hwnd) {
+    ; Validate the hwnd parameter
+    try {
+        if (!hwnd || hwnd = 0) {
+            if (DEBUG_MODE)
+                LogMessage("HandleNewWindow: Invalid window handle (null or zero)")
+            return
+        }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("HandleNewWindow: Error validating handle parameter: " err.Message)
+        return
+    }
+    
+    ; Verify window still exists
+    try {
+        if (!WinExist("ahk_id " hwnd)) {
+            if (DEBUG_MODE)
+                LogMessage("HandleNewWindow: Window " hwnd " no longer exists")
+            return
+        }
+    } catch Error as existErr {
+        if (DEBUG_MODE)
+            LogMessage("HandleNewWindow: Error checking window existence: " existErr.Message)
+        return
+    }
+    
+    ; Get monitor index safely
+    try {
+        monitorIndex := GetWindowMonitorIndex(hwnd)
+        if (DEBUG_MODE)
+            LogMessage("HandleNewWindow: Window is on monitor " monitorIndex)
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("HandleNewWindow: Error getting monitor index: " err.Message)
+        monitorIndex := 1 ; Default to primary
+    }
+    
+    ; Rest of handling logic...
+}
+
+WindowCreationCheck(hwnd) {
+    ; Validate the hwnd parameter
+    try {
+        if (!hwnd || hwnd = 0) {
+            if (DEBUG_MODE)
+                LogMessage("WindowCreationCheck: Invalid window handle (null or zero)")
+            return
+        }
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("WindowCreationCheck: Error validating handle parameter: " err.Message)
+        return
+    }
+    
+    ; Verify window still exists
+    try {
+        if (!WinExist("ahk_id " hwnd)) {
+            if (DEBUG_MODE)
+                LogMessage("WindowCreationCheck: Window " hwnd " no longer exists")
+            return
+        }
+    } catch Error as existErr {
+        if (DEBUG_MODE)
+            LogMessage("WindowCreationCheck: Error checking window existence: " existErr.Message)
+        return
+    }
+    
+    ; Call HandleNewWindow safely
+    try {
+        HandleNewWindow(hwnd)
+    } catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("WindowCreationCheck: Error in HandleNewWindow: " err.Message)
+    }
+}
 
 ; ====== Global Variables ======
 ; ===== DEBUG SETTINGS =====
@@ -2607,10 +2666,10 @@ ExitHandler(ExitReason, ExitCode) {
     }
     
     ; Remove message hooks
-    OnMessage(0x0003, WindowMoveResizeHandler, 0)  ; WM_MOVE
-    OnMessage(0x0005, WindowMoveResizeHandler, 0)  ; WM_SIZE
-    OnMessage(0x0001, NewWindowHandler, 0)         ; WM_CREATE
-    OnMessage(0x0002, WindowCloseHandler, 0)       ; WM_DESTROY
+    OnMessage(0x0003, WindowMoveResizeHandler, 1)  ; WM_MOVE (priority 1)
+    OnMessage(0x0005, WindowMoveResizeHandler, 1)  ; WM_SIZE (priority 1)
+    OnMessage(0x0001, NewWindowHandler, 1)         ; WM_CREATE (priority 1)
+    OnMessage(0x0002, WindowCloseHandler, 1)       ; WM_DESTROY (priority 1)
     
     ; Clean up any open tool tips
     ToolTip()
@@ -2780,10 +2839,10 @@ ToggleBordersAndOverlays() {
 
 ; ====== Register Event Handlers ======
 ; Track window move/resize events to update layouts
-OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE - Registers a handler for window move events
-OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE - Registers a handler for window resize events
+OnMessage(0x0003, WindowMoveResizeHandler, 1)  ; WM_MOVE - Registers a handler for window move events (priority 1)
+OnMessage(0x0005, WindowMoveResizeHandler, 1)  ; WM_SIZE - Registers a handler for window resize events (priority 1)
 ; Track new window events to assign to current workspace
 ; This event provides an hwnd when a window is created
-OnMessage(0x0001, NewWindowHandler)  ; WM_CREATE - Registers a handler for window creation events
+OnMessage(0x0001, NewWindowHandler, 1)  ; WM_CREATE - Registers a handler for window creation events (priority 1)
 ; Track window close events to remove windows from tracking
-OnMessage(0x0002, WindowCloseHandler)  ; WM_DESTROY - Registers a handler for window destruction events
+OnMessage(0x0002, WindowCloseHandler, 1)  ; WM_DESTROY - Registers a handler for window destruction events (priority 1)

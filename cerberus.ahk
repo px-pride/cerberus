@@ -30,8 +30,7 @@ InitializeWorkspaces() {
             } else {
                 MonitorWorkspaces[monitorIndex] := 1  ; Default to workspace 1 if we have more monitors than workspaces
             }
-            if (DEBUG_MODE)
-                LogMessage("Assigned monitor " monitorIndex " to workspace " MonitorWorkspaces[monitorIndex])
+            LogMessage("Assigned monitor " monitorIndex " to workspace " MonitorWorkspaces[monitorIndex])
         }
     }
 

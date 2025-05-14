@@ -309,13 +309,13 @@ AbsoluteToRelativePosition(x, y, width, height, monitorIndex) {
         MonitorGetWorkArea(monitorIndex, &mLeft, &mTop, &mRight, &mBottom)
         monitorWidth := mRight - mLeft
         monitorHeight := mBottom - mTop
-        
+
         ; Calculate relative positions as percentages
         relX := (x - mLeft) / monitorWidth
         relY := (y - mTop) / monitorHeight
         relWidth := width / monitorWidth
         relHeight := height / monitorHeight
-        
+
         return {
             relX: relX,
             relY: relY,
@@ -343,13 +343,13 @@ RelativeToAbsolutePosition(relX, relY, relWidth, relHeight, monitorIndex) {
         MonitorGetWorkArea(monitorIndex, &mLeft, &mTop, &mRight, &mBottom)
         monitorWidth := mRight - mLeft
         monitorHeight := mBottom - mTop
-        
+
         ; Calculate absolute positions
         x := mLeft + (relX * monitorWidth)
         y := mTop + (relY * monitorHeight)
         width := relWidth * monitorWidth
         height := relHeight * monitorHeight
-        
+
         return {
             x: Round(x),
             y: Round(y),
@@ -407,10 +407,10 @@ SaveWindowLayout(hwnd, workspaceID) { ; Stores window position and state for lat
                     LogMessage("SaveWindowLayout: Invalid position values for window " hwnd)
                 return ; Skip saving if we get invalid position values
             }
-            
+
             ; Get monitor index for this window
             monitorIndex := GetWindowMonitorIndex(hwnd)
-            
+
             ; Convert to relative position
             relativePos := AbsoluteToRelativePosition(x, y, width, height, monitorIndex)
 
@@ -495,13 +495,13 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
 
             if (layouts.Has(hwnd)) {
                 layout := layouts[hwnd]
-                
+
                 ; Get current monitor index for this window
                 currentMonitorIndex := GetWindowMonitorIndex(hwnd)
-                
+
                 ; If current monitor is different from saved monitor, we'll use relative positioning
                 useRelativePositioning := currentMonitorIndex != layout.monitorIndex
-                
+
                 if (DEBUG_MODE) {
                     if (useRelativePositioning)
                         LogMessage("Monitor changed: Original=" layout.monitorIndex ", Current=" currentMonitorIndex ". Using relative positioning.")
@@ -539,12 +539,12 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
                             ; Convert relative position to absolute for current monitor
                             absolutePos := RelativeToAbsolutePosition(
                                 layout.relX, layout.relY, layout.relWidth, layout.relHeight, currentMonitorIndex)
-                            
+
                             x := absolutePos.x
                             y := absolutePos.y
                             width := absolutePos.width
                             height := absolutePos.height
-                            
+
                             if (DEBUG_MODE)
                                 LogMessage("Using relative position: new x=" x ", y=" y ", w=" width ", h=" height)
                         } else {
@@ -786,22 +786,22 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
 
             ; Get the source monitor for the window
             sourceMonitorIndex := GetWindowMonitorIndex(activeHwnd)
-            
+
             ; Calculate position based on whether we've seen this window before
-            if (WindowWorkspaces.Has(activeHwnd) && WorkspaceLayouts.Has(WindowWorkspaces[activeHwnd]) && 
+            if (WindowWorkspaces.Has(activeHwnd) && WorkspaceLayouts.Has(WindowWorkspaces[activeHwnd]) &&
                 WorkspaceLayouts[WindowWorkspaces[activeHwnd]].Has(activeHwnd)) {
-                
+
                 ; Get existing layout data with relative positioning
                 existingWorkspaceID := WindowWorkspaces[activeHwnd]
                 existingLayout := WorkspaceLayouts[existingWorkspaceID][activeHwnd]
-                
+
                 if (DEBUG_MODE)
                     LogMessage("Found existing layout data for window, using relative positioning")
-                
+
                 ; Use relative positioning to calculate new position on target monitor
                 absolutePos := RelativeToAbsolutePosition(
                     existingLayout.relX, existingLayout.relY, existingLayout.relWidth, existingLayout.relHeight, targetMonitor)
-                
+
                 newX := absolutePos.x
                 newY := absolutePos.y
                 newWidth := absolutePos.width
@@ -814,7 +814,7 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
                 ; No previous layout data - center window on monitor
                 if (DEBUG_MODE)
                     LogMessage("No existing layout data, centering window on monitor")
-                
+
                 newX := mLeft + (mRight - mLeft - width) / 2
                 newY := mTop + (mBottom - mTop - height) / 2
                 newWidth := width
@@ -929,11 +929,11 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
             ; Get monitor dimensions
             MonitorGetWorkArea(activeMonitor, &aLeft, &aTop, &aRight, &aBottom)
             MonitorGetWorkArea(otherMonitor, &oLeft, &oTop, &oRight, &oBottom)
-            
+
             ; Calculate offset between monitors (to maintain relative positions)
             offsetX := aLeft - oLeft
             offsetY := aTop - oTop
-            
+
             ; Get all open windows
             windows := WinGetList()
             if (DEBUG_MODE)
@@ -942,7 +942,7 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
             ; Collect windows on each monitor
             activeMonitorWindows := []
             otherMonitorWindows := []
-            
+
             for index, hwnd in windows {
                 ; Skip invalid windows
                 if (!IsWindowValid(hwnd))
@@ -950,19 +950,19 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
 
                 ; Get window monitor
                 windowMonitor := GetWindowMonitor(hwnd)
-                
+
                 ; Collect windows by monitor
                 if (windowMonitor = activeMonitor)
                     activeMonitorWindows.Push(hwnd)
                 else if (windowMonitor = otherMonitor)
                     otherMonitorWindows.Push(hwnd)
             }
-            
+
             if (DEBUG_MODE) {
-                LogMessage("Found " activeMonitorWindows.Length " windows on active monitor and " 
+                LogMessage("Found " activeMonitorWindows.Length " windows on active monitor and "
                     otherMonitorWindows.Length " windows on other monitor")
             }
-            
+
             ; Step 1: Swap workspace IDs between monitors
             if (DEBUG_MODE)
                 LogMessage("Swapping workspace IDs: " currentWorkspaceID " and " requestedID)
@@ -971,14 +971,14 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
 
             ; Update overlays immediately after changing workspace IDs
             UpdateAllOverlays()
-            
+
             ; Step 2: Move windows from active monitor to other monitor
             for index, hwnd in activeMonitorWindows {
                 try {
                     ; Get window position and state
                     WinGetPos(&x, &y, &width, &height, hwnd)
                     isMaximized := WinGetMinMax(hwnd) = 1
-                    
+
                     if (DEBUG_MODE) {
                         title := WinGetTitle(hwnd)
                         LogMessage("Moving window from active to other monitor: " title)
@@ -1033,21 +1033,21 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                                 LogMessage("CORRECTED position to ensure window is on other monitor: " title)
                         }
                     }
-                    
+
                     Sleep(30) ; Short delay to prevent overwhelming the system
                 } catch Error as err {
                     if (DEBUG_MODE)
                         LogMessage("ERROR moving window: " err.Message)
                 }
             }
-            
+
             ; Step 3: Move windows from other monitor to active monitor
             for index, hwnd in otherMonitorWindows {
                 try {
                     ; Get window position and state
                     WinGetPos(&x, &y, &width, &height, hwnd)
                     isMaximized := WinGetMinMax(hwnd) = 1
-                    
+
                     if (DEBUG_MODE) {
                         title := WinGetTitle(hwnd)
                         LogMessage("Moving window from other to active monitor: " title)
@@ -1102,14 +1102,14 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                                 LogMessage("CORRECTED position to ensure window is on active monitor: " title)
                         }
                     }
-                    
+
                     Sleep(30) ; Short delay to prevent overwhelming the system
                 } catch Error as err {
                     if (DEBUG_MODE)
                         LogMessage("ERROR moving window: " err.Message)
                 }
             }
-            
+
             if (DEBUG_MODE)
                 LogMessage("Moved windows between monitors while preserving layout")
         }
@@ -1216,7 +1216,7 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                             WinRestore("ahk_id " hwnd)
                             Sleep(30) ; Allow time for the restore operation to complete
                         }
-                        
+
                         ; Now use saved layout data to restore the window properly
                         RestoreWindowLayout(hwnd, requestedID)
 
@@ -1305,13 +1305,13 @@ CleanupWindowReferences() {
 
     ; Clean up lastWindowState map if it exists in the WindowMoveResizeHandler function
     staleCount := 0
-    
+
     ; Only try to clean up lastWindowState if the property exists on the function
     try {
         ; Check if the static map has been initialized in WindowMoveResizeHandler
         if (ObjHasOwnProp(WindowMoveResizeHandler, "lastWindowState")) {
             lastStateMap := WindowMoveResizeHandler.lastWindowState
-            
+
             for hwnd, state in lastStateMap {
                 try {
                     if !WinExist(hwnd) {
@@ -1329,7 +1329,7 @@ CleanupWindowReferences() {
         if (DEBUG_MODE)
             LogMessage("Info: Skipping lastWindowState cleanup - not initialized yet")
     }
-    
+
     ; Clean up WindowWorkspaces map
     workspaceStaleCount := 0
     for hwnd, workspaceID in WindowWorkspaces {
@@ -1349,7 +1349,7 @@ CleanupWindowReferences() {
     if (workspaceStaleCount > 0) {
         UpdateWorkspaceWindowOverlay() ; Update overlay if visible
     }
-    
+
     ; Clean up WorkspaceLayouts map
     layoutTotalStaleCount := 0
     for workspaceID, layoutMap in WorkspaceLayouts {
@@ -1371,7 +1371,7 @@ CleanupWindowReferences() {
             layoutTotalStaleCount += layoutStaleCount
         }
     }
-    
+
     if ((staleCount > 0 || workspaceStaleCount > 0 || layoutTotalStaleCount > 0) && DEBUG_MODE) {
         LogMessage("Cleaned up " staleCount " window state entries, " workspaceStaleCount " workspace entries, and " layoutTotalStaleCount " layout entries")
     }
@@ -1381,7 +1381,7 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
     ; Reference global variables
     global SWITCH_IN_PROGRESS, SCRIPT_EXITING, DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
     LogMessage("WindowMoveResizeHandler called - msg: " msg ", hwnd: " hwnd ", wParam: " wParam ", lParam: " lParam)
-    
+
     ; Debug to check if we got the right window handle
     try {
         title := WinGetTitle("ahk_id " hwnd)
@@ -1482,17 +1482,17 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
         ; Track monitor changes for relative positioning
         static lastWindowMonitor := Map()
         monitorChanged := false
-        
+
         ; Initialize if needed
         if (!lastWindowMonitor.Has(hwnd))
             lastWindowMonitor[hwnd] := windowMonitor
-            
+
         ; Check if monitor has changed
         if (lastWindowMonitor[hwnd] != windowMonitor) {
             monitorChanged := true
             if (DEBUG_MODE)
                 LogMessage("Window moved to different monitor: " lastWindowMonitor[hwnd] " -> " windowMonitor)
-            
+
             ; Update stored monitor
             lastWindowMonitor[hwnd] := windowMonitor
         }
@@ -1520,7 +1520,7 @@ WindowMoveResizeHandler(wParam, lParam, msg, hwnd) { ; Handles window move/resiz
         if (workspaceID > 0) {
             ; Save layout with relative positioning
             SaveWindowLayout(hwnd, workspaceID)
-            
+
             if (DEBUG_MODE && monitorChanged)
                 LogMessage("Updated window layout with relative positioning due to monitor change")
         }
@@ -1800,7 +1800,7 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
 
                 ; Window already has workspace assignment, but may need updating if it moved monitors
                 currentWorkspaceID := WindowWorkspaces[hwnd]
-                
+
                 ; IMPORTANT: Always save the layout, even for existing windows
                 ; This ensures we always have layout data for relative positioning
                 SaveWindowLayout(hwnd, currentWorkspaceID)
@@ -2108,7 +2108,7 @@ CreateOverlay(monitorIndex) { ; Creates workspace indicator overlay for specifie
 
     ; Get monitor dimensions
     MonitorGetWorkArea(monitorIndex, &mLeft, &mTop, &mRight, &mBottom) ; Gets coordinates of monitor
-    
+
     ; Calculate overlay position based on preference
     if (OVERLAY_POSITION = "TopLeft") {
         x := mLeft + OVERLAY_MARGIN
@@ -2123,11 +2123,11 @@ CreateOverlay(monitorIndex) { ; Creates workspace indicator overlay for specifie
         x := mRight - OVERLAY_SIZE - OVERLAY_MARGIN
         y := mBottom - OVERLAY_SIZE - OVERLAY_MARGIN
     }
-    
+
     ; Create GUI for overlay
     overlay := Gui("+AlwaysOnTop -Caption +ToolWindow +Owner") ; Creates a borderless, always-on-top window
     overlay.BackColor := "222222" ; Dark gray background
-    
+
     ; Add workspace label
     workspaceID := MonitorWorkspaces.Has(monitorIndex) ? MonitorWorkspaces[monitorIndex] : 0
     overlay.SetFont("s30 bold", "Arial") ; Increased font size for better visibility
@@ -2135,17 +2135,17 @@ CreateOverlay(monitorIndex) { ; Creates workspace indicator overlay for specifie
     verticalOffset := 8 ; Moderate y-offset for precise vertical centering
     ; Add text with proper centering (both horizontal and vertical)
     overlay.Add("Text", "x0 y" verticalOffset " c33FFFF Center vWorkspaceText w" OVERLAY_SIZE " h" OVERLAY_SIZE, workspaceID) ; Adds text label with workspace ID
-    
+
     ; Show the overlay first so we can set transparency
     overlay.Show("x" x " y" y " w" OVERLAY_SIZE " h" OVERLAY_SIZE " NoActivate") ; Shows the overlay
-    
+
     ; Set transparency after the window is shown
     try {
         WinSetTransparent(OVERLAY_OPACITY, "ahk_id " overlay.Hwnd) ; Sets window transparency
     } catch Error as err {
         ; If transparency setting fails, continue without it
     }
-    
+
     ; Store overlay reference
     WorkspaceOverlays[monitorIndex] := overlay
     ; Overlay is already shown above
@@ -2173,15 +2173,15 @@ UpdateOverlay(monitorIndex) { ; Updates the workspace indicator for specified mo
 
     overlay := WorkspaceOverlays[monitorIndex]
     workspaceID := MonitorWorkspaces.Has(monitorIndex) ? MonitorWorkspaces[monitorIndex] : 0
-    
+
     ; Update the text control by name
     try {
         ; Get the text control
         ctrl := overlay["WorkspaceText"]
-        
+
         ; Update the text value
         ctrl.Value := workspaceID ; Updates the text to current workspace ID
-        
+
         ; Ensure proper position - redoing options to maintain vertical centering
         verticalOffset := 8 ; Match the offset used in CreateOverlay
         ctrl.Opt("x0 y" verticalOffset " Center w" OVERLAY_SIZE " h" OVERLAY_SIZE)
@@ -2194,7 +2194,7 @@ UpdateOverlay(monitorIndex) { ; Updates the workspace indicator for specified mo
             break ; Only update the first control
         }
     }
-    
+
     ; Show the overlay
     overlay.Show("NoActivate") ; Shows the overlay without activating it
 }
@@ -2518,7 +2518,7 @@ HandleNewWindow(hwnd) {
             LogMessage("HandleNewWindow: Error validating handle parameter: " err.Message)
         return
     }
-    
+
     ; Verify window still exists
     try {
         if (!WinExist("ahk_id " hwnd)) {
@@ -2531,7 +2531,7 @@ HandleNewWindow(hwnd) {
             LogMessage("HandleNewWindow: Error checking window existence: " existErr.Message)
         return
     }
-    
+
     ; Get monitor index safely
     try {
         monitorIndex := GetWindowMonitorIndex(hwnd)
@@ -2542,7 +2542,7 @@ HandleNewWindow(hwnd) {
             LogMessage("HandleNewWindow: Error getting monitor index: " err.Message)
         monitorIndex := 1 ; Default to primary
     }
-    
+
     ; Rest of handling logic...
 }
 
@@ -2559,7 +2559,7 @@ WindowCreationCheck(hwnd) {
             LogMessage("WindowCreationCheck: Error validating handle parameter: " err.Message)
         return
     }
-    
+
     ; Verify window still exists
     try {
         if (!WinExist("ahk_id " hwnd)) {
@@ -2572,7 +2572,7 @@ WindowCreationCheck(hwnd) {
             LogMessage("WindowCreationCheck: Error checking window existence: " existErr.Message)
         return
     }
-    
+
     ; Call HandleNewWindow safely
     try {
         HandleNewWindow(hwnd)
@@ -2639,7 +2639,7 @@ ExitHandler(ExitReason, ExitCode) {
     SetTimer(CleanupWindowReferences, 0)
     SetTimer(CheckMouseMovement, 0)
     SetTimer(PeriodicOverlayUpdate, 0)
-    
+
     ; Clean up workspace overlays
     try {
         for monitorIndex, overlay in WorkspaceOverlays {
@@ -2652,7 +2652,7 @@ ExitHandler(ExitReason, ExitCode) {
         if (DEBUG_MODE)
             LogMessage("Error cleaning up workspace overlays: " err.Message)
     }
-    
+
     ; Clean up window list overlay
     try {
         if (WindowListOverlay && WindowListOverlay.HasProp("Hwnd") && WinExist("ahk_id " WindowListOverlay.Hwnd)) {
@@ -2664,22 +2664,22 @@ ExitHandler(ExitReason, ExitCode) {
         if (DEBUG_MODE)
             LogMessage("Error cleaning up window list overlay: " err.Message)
     }
-    
+
     ; Remove message hooks
-    OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE
-    OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE
-    OnMessage(0x0001, NewWindowHandler)         ; WM_CREATE
-    OnMessage(0x0002, WindowCloseHandler)       ; WM_DESTROY
-    
+    OnMessage(0x0003, WindowMoveResizeHandler, 0)  ; WM_MOVE
+    OnMessage(0x0005, WindowMoveResizeHandler, 0)  ; WM_SIZE
+    OnMessage(0x0001, NewWindowHandler, 0)         ; WM_CREATE
+    OnMessage(0x0002, WindowCloseHandler, 0)       ; WM_DESTROY
+
     ; Clean up any open tool tips
     ToolTip()
-    
+
     ; Clean up static maps in handlers to prevent memory leaks
     try {
         ; Clean global maps to release references to window handles
         WindowWorkspaces := Map()
         WorkspaceLayouts := Map()
-        
+
         ; Clear any remaining handler static variables if possible
         if (ObjHasOwnProp(WindowMoveResizeHandler, "lastWindowState")) {
             WindowMoveResizeHandler.lastWindowState := Map()
@@ -2688,7 +2688,7 @@ ExitHandler(ExitReason, ExitCode) {
         if (DEBUG_MODE)
             LogMessage("Error cleaning up handler static variables: " err.Message)
     }
-    
+
     ; Log successful exit
     if (DEBUG_MODE)
         LogMessage("Successfully cleaned up resources, script terminating cleanly")

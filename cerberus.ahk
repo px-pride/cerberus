@@ -2665,11 +2665,8 @@ ExitHandler(ExitReason, ExitCode) {
             LogMessage("Error cleaning up window list overlay: " err.Message)
     }
 
-    ; Remove message hooks
-    OnMessage(0x0003, WindowMoveResizeHandler, 0)  ; WM_MOVE
-    OnMessage(0x0005, WindowMoveResizeHandler, 0)  ; WM_SIZE
-    OnMessage(0x0001, NewWindowHandler, 0)         ; WM_CREATE
-    OnMessage(0x0002, WindowCloseHandler, 0)       ; WM_DESTROY
+    ; Remove timers
+    SetTimer(CheckWindowChanges, 0)  ; Stop window tracking timer (100ms)
 
     ; Clean up any open tool tips
     ToolTip()
@@ -2837,12 +2834,204 @@ ToggleBordersAndOverlays() {
     ToggleMonitorBorders()
 }
 
-; ====== Register Event Handlers ======
-; Track window move/resize events to update layouts
-OnMessage(0x0003, WindowMoveResizeHandler)  ; WM_MOVE - Registers a handler for window move events
-OnMessage(0x0005, WindowMoveResizeHandler)  ; WM_SIZE - Registers a handler for window resize events
-; Track new window events to assign to current workspace
-; This event provides an hwnd when a window is created
-OnMessage(0x0001, NewWindowHandler)  ; WM_CREATE - Registers a handler for window creation events
-; Track window close events to remove windows from tracking
-OnMessage(0x0002, WindowCloseHandler)  ; WM_DESTROY - Registers a handler for window destruction events
+; ====== Timer-based Window State Tracking ======
+; CheckWindowChanges periodically checks for window creation, movement, resizing, and closure
+; This replaces the problematic message handlers with reliable polling
+CheckWindowChanges(*) {
+    ; Reference global variables
+    global SWITCH_IN_PROGRESS, SCRIPT_EXITING, DEBUG_MODE
+    global MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
+    static lastWindowState := Map()  ; Track position and size of windows
+    static lastWindowList := Map()   ; Track which windows exist
+    
+    ; Skip if script is exiting
+    if (SCRIPT_EXITING) {
+        if (DEBUG_MODE)
+            LogMessage("Script is exiting, ignoring window change check")
+        return
+    }
+    
+    ; Skip if workspace switch is in progress 
+    if (SWITCH_IN_PROGRESS) {
+        if (DEBUG_MODE)
+            LogMessage("Workspace switch in progress, ignoring window change check")
+        return
+    }
+    
+    ; Get the list of all windows
+    Try {
+        windowList := WinGetList()
+        
+        ; Check for new windows (creation)
+        for hwnd in windowList {
+            ; Skip if we're already tracking this window
+            if (lastWindowList.Has(hwnd))
+                continue
+                
+            ; New window detected
+            if (DEBUG_MODE)
+                LogMessage("New window detected: " hwnd)
+                
+            ; Skip invalid windows
+            if (!IsWindowValid(hwnd))
+                continue
+                
+            ; Log details
+            Try {
+                title := WinGetTitle(hwnd)
+                class := WinGetClass(hwnd)
+                if (DEBUG_MODE)
+                    LogMessage("NEW WINDOW CREATED: " title " (hwnd: " hwnd ", class: " class ")")
+            } Catch Error as err {
+                if (DEBUG_MODE)
+                    LogMessage("Error getting window details: " err.Message)
+            }
+            
+            ; Get window's monitor
+            monitorIndex := GetWindowMonitor(hwnd)
+            
+            ; If monitor has a workspace, assign window to it
+            if (MonitorWorkspaces.Has(monitorIndex)) {
+                workspaceID := MonitorWorkspaces[monitorIndex]
+                WindowWorkspaces[hwnd] := workspaceID
+                
+                if (DEBUG_MODE) {
+                    Try {
+                        title := WinGetTitle(hwnd)
+                        LogMessage("Assigned new window to workspace " workspaceID ": " title)
+                    } Catch Error as err {
+                        LogMessage("Assigned new window to workspace " workspaceID)
+                    }
+                }
+            }
+            
+            ; Add to tracking
+            lastWindowList[hwnd] := true
+            
+            ; Initialize position tracking
+            Try {
+                WinGetPos(&x, &y, &width, &height, "ahk_id " hwnd)
+                lastWindowState[hwnd] := {x: x, y: y, width: width, height: height, monitor: monitorIndex}
+            } Catch Error as err {
+                if (DEBUG_MODE)
+                    LogMessage("Error getting window position: " err.Message)
+            }
+        }
+        
+        ; Check for closed windows
+        for hwnd, _ in lastWindowList {
+            ; If window no longer exists in the current list
+            if (!windowList.IndexOf(hwnd)) {
+                ; Window was closed
+                if (DEBUG_MODE) {
+                    LogMessage("WINDOW CLOSED: hwnd: " hwnd)
+                }
+                
+                ; Remove from tracking maps
+                lastWindowList.Delete(hwnd)
+                lastWindowState.Delete(hwnd)
+                WindowWorkspaces.Delete(hwnd)
+                
+                ; Update workspace overlays if needed
+                UpdateWorkspaceWindowOverlay()
+            }
+        }
+        
+        ; Check for moved/resized windows
+        for hwnd in windowList {
+            ; Skip invalid windows
+            if (!IsWindowValid(hwnd))
+                continue
+                
+            ; Skip windows we're not tracking yet
+            if (!lastWindowState.Has(hwnd))
+                continue
+                
+            ; Get current position and size
+            Try {
+                WinGetPos(&x, &y, &width, &height, "ahk_id " hwnd)
+                
+                ; Get last known state
+                lastState := lastWindowState[hwnd]
+                
+                ; Check if position or size changed
+                if (x != lastState.x || y != lastState.y || width != lastState.width || height != lastState.height) {
+                    ; Position or size changed
+                    title := WinGetTitle(hwnd)
+                    class := WinGetClass(hwnd)
+                    
+                    ; Determine if moved or resized or both
+                    moved := (x != lastState.x || y != lastState.y)
+                    resized := (width != lastState.width || height != lastState.height)
+                    
+                    ; Log the change
+                    if (DEBUG_MODE) {
+                        if (moved && resized)
+                            LogMessage("WINDOW MOVED AND RESIZED: " title " (hwnd: " hwnd ", class: " class ")")
+                        else if (moved)
+                            LogMessage("WINDOW MOVED: " title " (hwnd: " hwnd ", class: " class ")")
+                        else if (resized)
+                            LogMessage("WINDOW RESIZED: " title " (hwnd: " hwnd ", class: " class ")")
+                    }
+                    
+                    ; Check if monitor changed
+                    currentMonitor := GetWindowMonitor(hwnd)
+                    monitorChanged := (currentMonitor != lastState.monitor)
+                    
+                    if (monitorChanged) {
+                        if (DEBUG_MODE)
+                            LogMessage("Window moved to different monitor: " lastState.monitor " -> " currentMonitor)
+                            
+                        ; Update monitor tracking
+                        lastState.monitor := currentMonitor
+                        
+                        ; If the monitor has a workspace assigned
+                        if (MonitorWorkspaces.Has(currentMonitor)) {
+                            currentMonitorWorkspace := MonitorWorkspaces[currentMonitor]
+                            
+                            ; Update window's workspace if needed
+                            if (WindowWorkspaces.Has(hwnd)) {
+                                currentWindowWorkspace := WindowWorkspaces[hwnd]
+                                
+                                ; If window's workspace doesn't match monitor's workspace
+                                if (currentWindowWorkspace != currentMonitorWorkspace && currentWindowWorkspace != 0) {
+                                    WindowWorkspaces[hwnd] := currentMonitorWorkspace
+                                    if (DEBUG_MODE)
+                                        LogMessage("Window moved to different monitor, reassigned from workspace " 
+                                                 currentWindowWorkspace " to " currentMonitorWorkspace ": " title)
+                                    UpdateWorkspaceWindowOverlay()
+                                }
+                            }
+                        }
+                    }
+                    
+                    ; Save layout if window has workspace assignment
+                    if (WindowWorkspaces.Has(hwnd)) {
+                        workspaceID := WindowWorkspaces[hwnd]
+                        if (workspaceID > 0) {
+                            ; Save layout with relative positioning
+                            SaveWindowLayout(hwnd, workspaceID)
+                            
+                            if (DEBUG_MODE && monitorChanged)
+                                LogMessage("Updated window layout with relative positioning due to monitor change")
+                        }
+                    }
+                    
+                    ; Update tracked state
+                    lastWindowState[hwnd] := {x: x, y: y, width: width, height: height, monitor: currentMonitor}
+                }
+            } Catch Error as err {
+                if (DEBUG_MODE)
+                    LogMessage("Error checking window position: " err.Message)
+            }
+        }
+        
+    } Catch Error as err {
+        if (DEBUG_MODE)
+            LogMessage("Error in CheckWindowChanges: " err.Message)
+    }
+}
+
+; ====== Register Timer for Window State Tracking ======
+; Set up a timer to track window movements and changes (runs every 100ms for more responsive tracking)
+SetTimer(CheckWindowChanges, 100)

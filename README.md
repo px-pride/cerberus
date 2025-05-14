@@ -29,7 +29,6 @@ Cerberus uses the following keyboard shortcuts:
 - **Ctrl + 1-9**: Switch to workspace 1-9 on the active monitor
 - **Ctrl + Shift + 1-9**: Send the active window to workspace 1-9
 - **Ctrl + 0**: Toggle workspace number overlays and monitor border
-- **Ctrl + `** (backtick): Toggle window assignments overlay
 
 ## How It Works
 
@@ -71,10 +70,11 @@ BORDER_THICKNESS := 3   ; Thickness of monitor border in pixels
 
 ## Bugs
 
-- backtick overlay not updating
+- proportional resizing between monitors not working
 
 ## Feature Requests
 
+- ctrl+backtick overlay displaying window workspace map
 - better system tray icon
 - visual settings config menu
 

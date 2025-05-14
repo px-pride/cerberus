@@ -2223,7 +2223,6 @@ dlg.Add("Text", "w382", "Cerberus Instructions:")
 dlg.Add("Text", "w382 y+0", "Press Ctrl+1 through Ctrl+9 to switch workspaces.")
 dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send active window to specific workspace.")
 dlg.Add("Text", "w382 y+0", "Press Ctrl+0 to toggle workspace number overlays and monitor border.")
-dlg.Add("Text", "w382 y+0", "Press Ctrl+` to toggle window assignments overlay.")
 dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
 dlg.Add("Text", "w382 y+0", "Press OK to continue.")
 

@@ -89,7 +89,7 @@ InitializeWorkspaces() {
 
 IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
     ; Reference global variables
-    global DEBUG_MODE, A_ScriptHwnd
+    global A_ScriptHwnd
 
     ; Skip invalid handles safely
     try {
@@ -105,7 +105,6 @@ IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
         title := WinGetTitle(hwnd) ; Gets the window title
         class := WinGetClass(hwnd) ; Gets the window class
 
-        ; Debug output for all windows only if DEBUG_MODE is on
         LogMessage("Checking window - Title: " title ", Class: " class ", hwnd: " hwnd)
 
         ; Fast checks first (skip windows without a title or class)
@@ -247,8 +246,7 @@ GetWindowMonitorIndex(windowHandle) { ; Improved version with better error handl
 
 GetActiveMonitor() { ; Gets the monitor index where the mouse cursor is located
     ; Reference global variables
-    global DEBUG_MODE
-
+    global 
     try {
         ; Get mouse cursor position
         MouseGetPos(&mouseX, &mouseY)
@@ -550,7 +548,7 @@ RestoreWindowLayout(hwnd, workspaceID) { ; Restores a window to its saved positi
 
 ; Function to log messages either to file or debug output
 LogMessage(message) {
-    global DEBUG_MODE, LOG_TO_FILE, LOG_FILE, SHOW_WINDOW_EVENT_TOOLTIPS, SHOW_TRAY_NOTIFICATIONS
+    global LOG_TO_FILE, LOG_FILE, SHOW_WINDOW_EVENT_TOOLTIPS, SHOW_TRAY_NOTIFICATIONS
 
     ; Only log if debugging is enabled
     if (!DEBUG_MODE)
@@ -614,8 +612,7 @@ LogMessage(message) {
 ; Helper function for delayed window checking
 DelayedWindowCheck(hwnd, *) {
     ; Reference global variables
-    global SCRIPT_EXITING, DEBUG_MODE
-
+    global SCRIPT_EXITING
     ; Skip if script is exiting
     if (SCRIPT_EXITING) {
         LogMessage("Script is exiting, ignoring delayed window check")
@@ -640,7 +637,7 @@ DelayedWindowCheck(hwnd, *) {
 
 SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified workspace
     ; Reference global variables
-    global SWITCH_IN_PROGRESS, DEBUG_MODE, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
+    global SWITCH_IN_PROGRESS, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
 
     ; Early exit conditions
     if (targetWorkspaceID < 1 || targetWorkspaceID > MAX_WORKSPACES)
@@ -788,7 +785,7 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
 
 SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     ; Reference global variables
-    global SWITCH_IN_PROGRESS, DEBUG_MODE, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
+    global SWITCH_IN_PROGRESS, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
 
     ; Early exit conditions
     if (requestedID < 1 || requestedID > MAX_WORKSPACES)
@@ -1177,7 +1174,7 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
 ; Clean up stale window references to prevent memory leaks
 CleanupWindowReferences() {
     ; Reference global variables
-    global DEBUG_MODE, SCRIPT_EXITING, WindowWorkspaces, WorkspaceLayouts
+    global SCRIPT_EXITING, WindowWorkspaces, WorkspaceLayouts
 
     ; Skip if script is exiting
     if (SCRIPT_EXITING) {
@@ -1216,20 +1213,20 @@ CleanupWindowReferences() {
                 layoutStaleCount++
             }
         }
-        if (layoutStaleCount > 0 && DEBUG_MODE) {
+        if (layoutStaleCount > 0) {
             LogMessage("Cleaned up " layoutStaleCount " stale layout entries for workspace " workspaceID)
             layoutTotalStaleCount += layoutStaleCount
         }
     }
     
-    if ((workspaceStaleCount > 0 || layoutTotalStaleCount > 0) && DEBUG_MODE) {
+    if (workspaceStaleCount > 0 || layoutTotalStaleCount > 0) {
         LogMessage("Cleaned up " workspaceStaleCount " workspace entries, and " layoutTotalStaleCount " layout entries")
     }
 }
 
 AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed follow-up check)
     ; Reference global variables
-    global DEBUG_MODE, MonitorWorkspaces, WindowWorkspaces
+    global MonitorWorkspaces, WindowWorkspaces
 
     ; Validate the hwnd parameter
     try {
@@ -1389,7 +1386,7 @@ InitializeOverlays() { ; Creates and displays workspace number indicators and mo
 
 InitializeMonitorBorders() { ; Creates border overlays for all monitors
     ; Reference global variables
-    global BorderOverlay, DEBUG_MODE, BORDER_COLOR, BORDER_THICKNESS
+    global BorderOverlay, BORDER_COLOR, BORDER_THICKNESS
 
     ; Clear any existing border overlays
     for _, overlay in BorderOverlay {
@@ -1468,7 +1465,6 @@ CreateMonitorBorder(monitorIndex, mLeft, mTop, mRight, mBottom) { ; Creates bord
 GetWorkspaceWindowInfo() {
     ; Reference global variables
     global WindowWorkspaces, MAX_WORKSPACES, DEBUG_MODE
-
     LogMessage("Getting fresh window workspace information")
 
     ; Create a structure to hold window info by workspace
@@ -1543,7 +1539,7 @@ GetWorkspaceWindowInfo() {
 ; Function to log detailed workspace window information
 LogWorkspaceWindowContents(prefix := "") {
     ; Reference global variables
-    global DEBUG_MODE, MAX_WORKSPACES, WindowWorkspaces
+    global MAX_WORKSPACES, WindowWorkspaces, DEBUG_MODE
 
     if (!DEBUG_MODE)
         return
@@ -1735,8 +1731,7 @@ ToggleOverlays() { ; Toggles visibility of workspace indicators
 
 ShowMonitorBorder(monitorIndex) { ; Shows the border for a specific monitor
     ; Reference global variables
-    global BorderOverlay, DEBUG_MODE
-
+    global BorderOverlay
     try {
         if (BorderOverlay.Has(monitorIndex)) {
             edges := BorderOverlay[monitorIndex]
@@ -1754,8 +1749,7 @@ ShowMonitorBorder(monitorIndex) { ; Shows the border for a specific monitor
 
 HideMonitorBorder(monitorIndex) { ; Hides the border for a specific monitor
     ; Reference global variables
-    global BorderOverlay, DEBUG_MODE
-
+    global BorderOverlay
     try {
         if (BorderOverlay.Has(monitorIndex)) {
             edges := BorderOverlay[monitorIndex]
@@ -1773,7 +1767,7 @@ HideMonitorBorder(monitorIndex) { ; Hides the border for a specific monitor
 
 UpdateActiveMonitorBorder() { ; Updates the active monitor border based on current mouse position
     ; Reference global variables
-    global LAST_ACTIVE_MONITOR, DEBUG_MODE, BORDER_VISIBLE
+    global LAST_ACTIVE_MONITOR, BORDER_VISIBLE
 
     ; If borders are toggled off, do nothing
     if (!BORDER_VISIBLE)
@@ -1803,7 +1797,7 @@ UpdateActiveMonitorBorder() { ; Updates the active monitor border based on curre
 
 ToggleMonitorBorders() { ; Toggles visibility of all monitor borders
     ; Reference global variables
-    global BorderOverlay, BORDER_VISIBLE, DEBUG_MODE, LAST_ACTIVE_MONITOR
+    global BorderOverlay, BORDER_VISIBLE, LAST_ACTIVE_MONITOR
 
     ; Toggle the visibility state
     BORDER_VISIBLE := !BORDER_VISIBLE
@@ -1947,7 +1941,7 @@ global LAST_ACTIVE_MONITOR := 0 ; Tracks the last known active monitor
 OnExit(ExitHandler)
 
 ExitHandler(ExitReason, ExitCode) {
-    global DEBUG_MODE, SCRIPT_EXITING, WorkspaceOverlays, WindowListOverlay, WindowListVisible
+    global SCRIPT_EXITING, WorkspaceOverlays, WindowListOverlay, WindowListVisible
 
     ; Set flag to prevent handlers from running during exit
     SCRIPT_EXITING := True
@@ -2077,8 +2071,7 @@ SetTimer(CheckMouseMovement, 100) ; Check every 100ms
 ; Function to periodically check mouse position and update active monitor border
 CheckMouseMovement(*) {
     ; Reference global variables
-    global SCRIPT_EXITING, BORDER_VISIBLE, DEBUG_MODE
-
+    global SCRIPT_EXITING, BORDER_VISIBLE
     ; Skip if script is exiting
     if (SCRIPT_EXITING) {
         LogMessage("Script is exiting, ignoring mouse movement check")

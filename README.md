@@ -70,7 +70,7 @@ BORDER_THICKNESS := 3   ; Thickness of monitor border in pixels
 
 ## Bugs
 
-- proportional resizing between monitors not working
+- synesthesia windows not moving
 
 ## Feature Requests
 

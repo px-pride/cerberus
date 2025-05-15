@@ -670,6 +670,11 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
 
         ; Update window workspace assignment
         prevWorkspaceID := WindowWorkspaces.Has(activeHwnd) ? WindowWorkspaces[activeHwnd] : 0
+        
+        ; Save the current window layout before moving it
+        SaveWindowLayout(activeHwnd, prevWorkspaceID)
+        
+        ; Now update the workspace assignment
         WindowWorkspaces[activeHwnd] := targetWorkspaceID
 
         ; Check if target workspace is visible on any monitor
@@ -717,14 +722,13 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
             sourceMonitorIndex := GetWindowMonitorIndex(activeHwnd)
             
             ; Calculate position based on whether we've seen this window before
-            if (WindowWorkspaces.Has(activeHwnd) && WorkspaceLayouts.Has(WindowWorkspaces[activeHwnd]) && 
-                WorkspaceLayouts[WindowWorkspaces[activeHwnd]].Has(activeHwnd)) {
+            if (prevWorkspaceID > 0 && WorkspaceLayouts.Has(prevWorkspaceID) && 
+                WorkspaceLayouts[prevWorkspaceID].Has(activeHwnd)) {
                 
                 ; Get existing layout data with relative positioning
-                existingWorkspaceID := WindowWorkspaces[activeHwnd]
-                existingLayout := WorkspaceLayouts[existingWorkspaceID][activeHwnd]
+                existingLayout := WorkspaceLayouts[prevWorkspaceID][activeHwnd]
                 
-                LogMessage("Found existing layout data for window, using relative positioning")
+                LogMessage("Found existing layout data for window from workspace " prevWorkspaceID ", using relative positioning")
                 
                 ; Use relative positioning to calculate new position on target monitor
                 absolutePos := RelativeToAbsolutePosition(
@@ -737,13 +741,21 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
                 LogMessage(absolutePos.x " " absolutePos.y " " absolutePos.width " " absolutePos.height)
                 LogMessage("Using relative position: new x=" newX ", y=" newY ", w=" newWidth ", h=" newHeight)
             } else {
-                ; No previous layout data - center window on monitor
-                LogMessage("No existing layout data, centering window on monitor")
+                ; No previous layout data - use current window dimensions and maintain proportions
+                LogMessage("No existing layout data, using current window proportions")
                 
-                newX := mLeft + (mRight - mLeft - width) / 2
-                newY := mTop + (mBottom - mTop - height) / 2
-                newWidth := width
-                newHeight := height
+                ; Convert current position to relative on source monitor
+                relativePos := AbsoluteToRelativePosition(x, y, width, height, sourceMonitorIndex)
+                
+                ; Convert relative position to absolute on target monitor
+                absolutePos := RelativeToAbsolutePosition(
+                    relativePos.relX, relativePos.relY, relativePos.relWidth, relativePos.relHeight, targetMonitor)
+                
+                newX := absolutePos.x
+                newY := absolutePos.y
+                newWidth := absolutePos.width
+                newHeight := absolutePos.height
+                LogMessage("Calculated relative position from current: new x=" newX ", y=" newY ", w=" newWidth ", h=" newHeight)
             }
 
             ; Move the window to target monitor
@@ -767,8 +779,7 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
             ; Minimize the window
             WinMinimize("ahk_id " activeHwnd)
 
-            ; Save window layout for future restoration
-            SaveWindowLayout(activeHwnd, targetWorkspaceID)
+            ; No need to save layout here as it was already saved at the beginning
         }
 
 
@@ -871,7 +882,28 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
             LogMessage("Found " activeMonitorWindows.Length " windows on active monitor and " 
                 otherMonitorWindows.Length " windows on other monitor")
             
-            ; Step 1: Swap workspace IDs between monitors
+            ; Step 1: Save all window layouts before switching
+            LogMessage("Saving all window layouts before workspace exchange")
+            
+            ; Save layouts for windows on active monitor
+            for index, hwnd in activeMonitorWindows {
+                try {
+                    SaveWindowLayout(hwnd, currentWorkspaceID)
+                } catch Error as err {
+                    LogMessage("ERROR saving layout for window: " err.Message)
+                }
+            }
+            
+            ; Save layouts for windows on other monitor
+            for index, hwnd in otherMonitorWindows {
+                try {
+                    SaveWindowLayout(hwnd, requestedID)
+                } catch Error as err {
+                    LogMessage("ERROR saving layout for window: " err.Message)
+                }
+            }
+            
+            ; Step 2: Swap workspace IDs between monitors
             LogMessage("Swapping workspace IDs: " currentWorkspaceID " and " requestedID)
             MonitorWorkspaces[otherMonitor] := currentWorkspaceID
             MonitorWorkspaces[activeMonitor] := requestedID
@@ -879,63 +911,53 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
             ; Update overlays immediately after changing workspace IDs
             UpdateAllOverlays()
             
-            ; Step 2: Move windows from active monitor to other monitor
+            ; Step 3: Move windows from active monitor to other monitor using relative positioning
             for index, hwnd in activeMonitorWindows {
                 try {
-                    ; Get window position and state
-                    WinGetPos(&x, &y, &width, &height, hwnd)
-                    isMaximized := WinGetMinMax(hwnd) = 1
-                    
                     title := WinGetTitle(hwnd)
                     LogMessage("Moving window from active to other monitor: " title)
-
-                    ; Move window, preserving layout
+                    
+                    ; Get current window state
+                    isMaximized := WinGetMinMax(hwnd) = 1
+                    
+                    ; If maximized, restore first
                     if (isMaximized) {
-                        ; First restore to normal, move, then maximize again
-                        if (WinGetMinMax(hwnd) = 1)
-                            WinRestore("ahk_id " hwnd)
-
-                        ; Move to new position
-                        WinMove(x - offsetX, y - offsetY, width, height, "ahk_id " hwnd)
-
-                        ; Verify the window was moved to the correct monitor
-                        Sleep(30) ; Allow time for the move operation to complete
-                        currMonitor := GetWindowMonitor(hwnd)
-
-                        if (currMonitor != otherMonitor) {
-                            ; Recalculate position in other monitor
-                            MonitorGetWorkArea(otherMonitor, &mLeft, &mTop, &mRight, &mBottom)
-                            centerX := mLeft + (mRight - mLeft - width) / 2
-                            centerY := mTop + (mBottom - mTop - height) / 2
-
-                            ; Force window to other monitor
-                            WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
-
-                            LogMessage("CORRECTED position to ensure window is on other monitor: " title)
-                        }
-
-                        ; Maximize again
-                        WinMaximize("ahk_id " hwnd)
-                    } else {
-                        ; For non-maximized windows, just move them
-                        WinMove(x - offsetX, y - offsetY, width, height, "ahk_id " hwnd)
-
-                        ; Verify the window was moved to the correct monitor
-                        Sleep(30) ; Allow time for the move operation to complete
-                        currMonitor := GetWindowMonitor(hwnd)
-
-                        if (currMonitor != otherMonitor) {
-                            ; Recalculate position in other monitor
-                            MonitorGetWorkArea(otherMonitor, &mLeft, &mTop, &mRight, &mBottom)
-                            centerX := mLeft + (mRight - mLeft - width) / 2
-                            centerY := mTop + (mBottom - mTop - height) / 2
-
-                            ; Force window to other monitor
-                            WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
-
-                            LogMessage("CORRECTED position to ensure window is on other monitor: " title)
-                        }
+                        WinRestore("ahk_id " hwnd)
+                        Sleep(30)
                     }
+                    
+                    ; Get saved layout data
+                    if (WorkspaceLayouts.Has(currentWorkspaceID) && 
+                        WorkspaceLayouts[currentWorkspaceID].Has(hwnd)) {
+                        
+                        layout := WorkspaceLayouts[currentWorkspaceID][hwnd]
+                        
+                        ; Convert relative position to absolute position on the target monitor
+                        absolutePos := RelativeToAbsolutePosition(
+                            layout.relX, layout.relY, layout.relWidth, layout.relHeight, otherMonitor)
+                        
+                        ; Move window to new position
+                        WinMove(absolutePos.x, absolutePos.y, absolutePos.width, absolutePos.height, "ahk_id " hwnd)
+                        
+                        LogMessage("Moved window using relative positioning to monitor " otherMonitor)
+                    } else {
+                        ; Fallback to centering if no layout data
+                        MonitorGetWorkArea(otherMonitor, &mLeft, &mTop, &mRight, &mBottom)
+                        WinGetPos(&x, &y, &width, &height, "ahk_id " hwnd)
+                        centerX := mLeft + (mRight - mLeft - width) / 2
+                        centerY := mTop + (mBottom - mTop - height) / 2
+                        WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
+                        LogMessage("No layout data - centered window on monitor " otherMonitor)
+                    }
+                    
+                    ; Maximize again if it was maximized
+                    if (isMaximized) {
+                        Sleep(30)
+                        WinMaximize("ahk_id " hwnd)
+                    }
+                    
+                    ; Save the new layout after moving
+                    SaveWindowLayout(hwnd, currentWorkspaceID)
                     
                     Sleep(30) ; Short delay to prevent overwhelming the system
                 } catch Error as err {
@@ -943,63 +965,53 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
                 }
             }
             
-            ; Step 3: Move windows from other monitor to active monitor
+            ; Step 4: Move windows from other monitor to active monitor using relative positioning
             for index, hwnd in otherMonitorWindows {
                 try {
-                    ; Get window position and state
-                    WinGetPos(&x, &y, &width, &height, hwnd)
-                    isMaximized := WinGetMinMax(hwnd) = 1
-                    
                     title := WinGetTitle(hwnd)
                     LogMessage("Moving window from other to active monitor: " title)
-
-                    ; Move window, preserving layout
+                    
+                    ; Get current window state
+                    isMaximized := WinGetMinMax(hwnd) = 1
+                    
+                    ; If maximized, restore first
                     if (isMaximized) {
-                        ; First restore to normal, move, then maximize again
-                        if (WinGetMinMax(hwnd) = 1)
-                            WinRestore("ahk_id " hwnd)
-
-                        ; Move to new position
-                        WinMove(x + offsetX, y + offsetY, width, height, "ahk_id " hwnd)
-
-                        ; Verify the window was moved to the correct monitor
-                        Sleep(30) ; Allow time for the move operation to complete
-                        currMonitor := GetWindowMonitor(hwnd)
-
-                        if (currMonitor != activeMonitor) {
-                            ; Recalculate position in active monitor
-                            MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
-                            centerX := mLeft + (mRight - mLeft - width) / 2
-                            centerY := mTop + (mBottom - mTop - height) / 2
-
-                            ; Force window to active monitor
-                            WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
-
-                            LogMessage("CORRECTED position to ensure window is on active monitor: " title)
-                        }
-
-                        ; Maximize again
-                        WinMaximize("ahk_id " hwnd)
-                    } else {
-                        ; For non-maximized windows, just move them
-                        WinMove(x + offsetX, y + offsetY, width, height, "ahk_id " hwnd)
-
-                        ; Verify the window was moved to the correct monitor
-                        Sleep(30) ; Allow time for the move operation to complete
-                        currMonitor := GetWindowMonitor(hwnd)
-
-                        if (currMonitor != activeMonitor) {
-                            ; Recalculate position in active monitor
-                            MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
-                            centerX := mLeft + (mRight - mLeft - width) / 2
-                            centerY := mTop + (mBottom - mTop - height) / 2
-
-                            ; Force window to active monitor
-                            WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
-
-                            LogMessage("CORRECTED position to ensure window is on active monitor: " title)
-                        }
+                        WinRestore("ahk_id " hwnd)
+                        Sleep(30)
                     }
+                    
+                    ; Get saved layout data
+                    if (WorkspaceLayouts.Has(requestedID) && 
+                        WorkspaceLayouts[requestedID].Has(hwnd)) {
+                        
+                        layout := WorkspaceLayouts[requestedID][hwnd]
+                        
+                        ; Convert relative position to absolute position on the target monitor
+                        absolutePos := RelativeToAbsolutePosition(
+                            layout.relX, layout.relY, layout.relWidth, layout.relHeight, activeMonitor)
+                        
+                        ; Move window to new position
+                        WinMove(absolutePos.x, absolutePos.y, absolutePos.width, absolutePos.height, "ahk_id " hwnd)
+                        
+                        LogMessage("Moved window using relative positioning to monitor " activeMonitor)
+                    } else {
+                        ; Fallback to centering if no layout data
+                        MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
+                        WinGetPos(&x, &y, &width, &height, "ahk_id " hwnd)
+                        centerX := mLeft + (mRight - mLeft - width) / 2
+                        centerY := mTop + (mBottom - mTop - height) / 2
+                        WinMove(centerX, centerY, width, height, "ahk_id " hwnd)
+                        LogMessage("No layout data - centered window on monitor " activeMonitor)
+                    }
+                    
+                    ; Maximize again if it was maximized
+                    if (isMaximized) {
+                        Sleep(30)
+                        WinMaximize("ahk_id " hwnd)
+                    }
+                    
+                    ; Save the new layout after moving
+                    SaveWindowLayout(hwnd, requestedID)
                     
                     Sleep(30) ; Short delay to prevent overwhelming the system
                 } catch Error as err {
@@ -1080,20 +1092,42 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
 
                     ; Move it to the active monitor if it's not already there
                     if (windowMonitor != activeMonitor) {
-                        ; Get monitor dimensions
-                        MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
+                        ; Try to use saved layout data with relative positioning
+                        moved := false
+                        
+                        if (WorkspaceLayouts.Has(requestedID) && 
+                            WorkspaceLayouts[requestedID].Has(hwnd)) {
+                            
+                            layout := WorkspaceLayouts[requestedID][hwnd]
+                            
+                            ; Convert relative position to absolute position on the active monitor
+                            absolutePos := RelativeToAbsolutePosition(
+                                layout.relX, layout.relY, layout.relWidth, layout.relHeight, activeMonitor)
+                            
+                            ; Move window to new position
+                            WinMove(absolutePos.x, absolutePos.y, absolutePos.width, absolutePos.height, "ahk_id " hwnd)
+                            
+                            LogMessage("MOVING window from monitor " windowMonitor " to active monitor " activeMonitor " using relative positioning: " title)
+                            moved := true
+                        }
+                        
+                        ; Fallback to centering if no layout data
+                        if (!moved) {
+                            ; Get monitor dimensions
+                            MonitorGetWorkArea(activeMonitor, &mLeft, &mTop, &mRight, &mBottom)
 
-                        ; Get window size
-                        WinGetPos(&x, &y, &width, &height, "ahk_id " hwnd)
+                            ; Get window size
+                            WinGetPos(&x, &y, &width, &height, "ahk_id " hwnd)
 
-                        ; Center window on active monitor
-                        newX := mLeft + (mRight - mLeft - width) / 2
-                        newY := mTop + (mBottom - mTop - height) / 2
+                            ; Center window on active monitor
+                            newX := mLeft + (mRight - mLeft - width) / 2
+                            newY := mTop + (mBottom - mTop - height) / 2
 
-                        ; Move window to active monitor
-                        WinMove(newX, newY, width, height, "ahk_id " hwnd)
+                            ; Move window to active monitor
+                            WinMove(newX, newY, width, height, "ahk_id " hwnd)
 
-                        LogMessage("MOVING window from monitor " windowMonitor " to active monitor " activeMonitor ": " title)
+                            LogMessage("MOVING window from monitor " windowMonitor " to active monitor " activeMonitor " (centered): " title)
+                        }
                     }
 
                     LogMessage("RESTORING window for workspace " requestedID ": " title)

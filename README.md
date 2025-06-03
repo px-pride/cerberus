@@ -70,10 +70,11 @@ BORDER_THICKNESS := 3   ; Thickness of monitor border in pixels
 
 ## Bugs
 
-- synesthesia windows not moving
+- disconnecting/connecting monitors
 
 ## Feature Requests
 
+- save/load window workspace map
 - ctrl+backtick overlay displaying window workspace map
 - better system tray icon
 - visual settings config menu

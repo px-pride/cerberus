@@ -1418,6 +1418,98 @@ InitializeOverlays() { ; Creates and displays workspace number indicators and mo
     ; No timer needed as we're using persistent overlays
 }
 
+RefreshMonitorConfiguration() { ; Refreshes overlays and monitor workspaces when monitors are connected/disconnected
+    ; Reference global variables
+    global MonitorWorkspaces, WorkspaceOverlays, BorderOverlay, BORDER_VISIBLE, LAST_ACTIVE_MONITOR, MAX_WORKSPACES
+    
+    LogMessage("============ REFRESHING MONITOR CONFIGURATION ============")
+    
+    ; Get current monitor count
+    newMonitorCount := MonitorGetCount()
+    oldMonitorCount := MonitorWorkspaces.Count
+    
+    LogMessage("Monitor count - Old: " oldMonitorCount ", New: " newMonitorCount)
+    
+    ; Step 1: Destroy all existing overlays
+    LogMessage("Destroying existing overlays...")
+    
+    ; Destroy workspace overlays
+    for monitorIndex, overlay in WorkspaceOverlays {
+        try {
+            overlay.Destroy()
+            LogMessage("Destroyed workspace overlay for monitor " monitorIndex)
+        } catch Error as err {
+            LogMessage("Error destroying workspace overlay: " err.Message)
+        }
+    }
+    WorkspaceOverlays := Map()
+    
+    ; Destroy border overlays
+    for monitorIndex, edges in BorderOverlay {
+        for edge, gui in edges {
+            try {
+                gui.Destroy()
+            } catch Error as err {
+                LogMessage("Error destroying border overlay: " err.Message)
+            }
+        }
+    }
+    BorderOverlay := Map()
+    
+    ; Step 2: Update MonitorWorkspaces mapping
+    LogMessage("Updating MonitorWorkspaces mapping...")
+    
+    ; Create a new map for monitor workspaces
+    newMonitorWorkspaces := Map()
+    
+    ; Preserve existing workspace assignments where possible
+    loop newMonitorCount {
+        monitorIndex := A_Index
+        
+        ; If this monitor had a workspace assignment before, preserve it
+        if (MonitorWorkspaces.Has(monitorIndex)) {
+            newMonitorWorkspaces[monitorIndex] := MonitorWorkspaces[monitorIndex]
+            LogMessage("Preserved workspace " MonitorWorkspaces[monitorIndex] " for monitor " monitorIndex)
+        } else {
+            ; Assign new monitors to their index as workspace (or 1 if index > MAX_WORKSPACES)
+            if (monitorIndex <= MAX_WORKSPACES) {
+                newMonitorWorkspaces[monitorIndex] := monitorIndex
+            } else {
+                newMonitorWorkspaces[monitorIndex] := 1
+            }
+            LogMessage("Assigned new monitor " monitorIndex " to workspace " newMonitorWorkspaces[monitorIndex])
+        }
+    }
+    
+    ; Replace the old mapping
+    MonitorWorkspaces := newMonitorWorkspaces
+    
+    ; Step 3: Recreate all overlays
+    LogMessage("Recreating overlays for " newMonitorCount " monitors...")
+    
+    ; Create workspace overlays for each monitor
+    loop newMonitorCount {
+        monitorIndex := A_Index
+        CreateOverlay(monitorIndex)
+        LogMessage("Created workspace overlay for monitor " monitorIndex)
+    }
+    
+    ; Create border overlays for all monitors
+    InitializeMonitorBorders()
+    
+    ; Step 4: Update overlay display
+    UpdateAllOverlays()
+    
+    ; Reset last active monitor to force border update
+    LAST_ACTIVE_MONITOR := 0
+    UpdateActiveMonitorBorder()
+    
+    ; Show a notification
+    TrayTip("Monitor Configuration Refreshed", "Detected " newMonitorCount " monitors")
+    
+    LogMessage("============ MONITOR REFRESH COMPLETE ============")
+}
+
 InitializeMonitorBorders() { ; Creates border overlays for all monitors
     ; Reference global variables
     global BorderOverlay, BORDER_COLOR, BORDER_THICKNESS
@@ -2080,6 +2172,7 @@ dlg.Add("Text", "w382", "Cerberus Instructions:")
 dlg.Add("Text", "w382 y+0", "Press Ctrl+1 through Ctrl+9 to switch workspaces.")
 dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send active window to specific workspace.")
 dlg.Add("Text", "w382 y+0", "Press Ctrl+0 to toggle workspace number overlays and monitor border.")
+dlg.Add("Text", "w382 y+0", "Press Alt+Shift+R to refresh overlays when monitors are connected/disconnected.")
 dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
 dlg.Add("Text", "w382 y+0", "Press OK to continue.")
 
@@ -2147,6 +2240,9 @@ CheckMouseMovement(*) {
 
 ; Ctrl+0 to toggle workspace overlays and monitor border
 ^0::ToggleBordersAndOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays and monitor border
+
+; Alt+Shift+R to refresh monitor configuration
+!+r::RefreshMonitorConfiguration() ; Alt+Shift+R hotkey to refresh overlays when monitors are connected/disconnected
 
 ; Function to toggle both workspace overlays and monitor borders with Ctrl+0
 ToggleBordersAndOverlays() {

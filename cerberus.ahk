@@ -1645,7 +1645,7 @@ GetWorkspaceWindowInfo() {
     ; Check the window counts for debugging
     if (DEBUG_MODE) {
         totalWindows := 0
-        for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] {
+        for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] {
             if (windowsByWorkspace.Has(i)) {
                 count := windowsByWorkspace[i].Length
                 LogMessage("Found " count " windows in workspace " i)
@@ -1678,7 +1678,7 @@ LogWorkspaceWindowContents(prefix := "") {
 
     ; Log each workspace's windows
     totalWindows := 0
-    for workspaceID in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] {
+    for workspaceID in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] {
         if (workspaceID > MAX_WORKSPACES && workspaceID != 0)
             continue
 
@@ -1950,7 +1950,7 @@ ToggleMonitorBorders() { ; Toggles visibility of all monitor borders
 }
 
 ; ====== Configuration ======
-MAX_WORKSPACES := 9  ; Maximum number of workspaces (1-9)
+MAX_WORKSPACES := 19  ; Maximum number of workspaces (1-19)
 MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
 
 ; ====== Additional Window Handling Functions ======
@@ -2169,8 +2169,10 @@ dlg.Title := "Cerberus"
 ; Add the information text with exact same formatting as the MsgBox
 dlg.SetFont("s9", "Segoe UI")
 dlg.Add("Text", "w382", "Cerberus Instructions:")
-dlg.Add("Text", "w382 y+0", "Press Ctrl+1 through Ctrl+9 to switch workspaces.")
-dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send active window to specific workspace.")
+dlg.Add("Text", "w382 y+0", "Press Ctrl+1 through Ctrl+9 to switch to workspaces 1-9.")
+dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt+0 through Ctrl+Alt+9 to switch to workspaces 10-19.")
+dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send window to workspaces 1-9.")
+dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+Alt+[Number] to send window to workspaces 10-19.")
 dlg.Add("Text", "w382 y+0", "Press Ctrl+0 to toggle workspace number overlays and monitor border.")
 dlg.Add("Text", "w382 y+0", "Press Alt+Shift+R to refresh overlays when monitors are connected/disconnected.")
 dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
@@ -2227,6 +2229,18 @@ CheckMouseMovement(*) {
 ^8::SwitchToWorkspace(8) ; Ctrl+8 hotkey to switch to workspace 8
 ^9::SwitchToWorkspace(9) ; Ctrl+9 hotkey to switch to workspace 9
 
+; Ctrl+Alt+0 through Ctrl+Alt+9 for switching to workspaces 10-19
+^!0::SwitchToWorkspace(10) ; Ctrl+Alt+0 hotkey to switch to workspace 10
+^!1::SwitchToWorkspace(11) ; Ctrl+Alt+1 hotkey to switch to workspace 11
+^!2::SwitchToWorkspace(12) ; Ctrl+Alt+2 hotkey to switch to workspace 12
+^!3::SwitchToWorkspace(13) ; Ctrl+Alt+3 hotkey to switch to workspace 13
+^!4::SwitchToWorkspace(14) ; Ctrl+Alt+4 hotkey to switch to workspace 14
+^!5::SwitchToWorkspace(15) ; Ctrl+Alt+5 hotkey to switch to workspace 15
+^!6::SwitchToWorkspace(16) ; Ctrl+Alt+6 hotkey to switch to workspace 16
+^!7::SwitchToWorkspace(17) ; Ctrl+Alt+7 hotkey to switch to workspace 17
+^!8::SwitchToWorkspace(18) ; Ctrl+Alt+8 hotkey to switch to workspace 18
+^!9::SwitchToWorkspace(19) ; Ctrl+Alt+9 hotkey to switch to workspace 19
+
 ; Ctrl+Shift+1 through Ctrl+Shift+9 for sending active window to workspaces
 ^+1::SendWindowToWorkspace(1) ; Ctrl+Shift+1 hotkey to send active window to workspace 1
 ^+2::SendWindowToWorkspace(2) ; Ctrl+Shift+2 hotkey to send active window to workspace 2
@@ -2237,6 +2251,18 @@ CheckMouseMovement(*) {
 ^+7::SendWindowToWorkspace(7) ; Ctrl+Shift+7 hotkey to send active window to workspace 7
 ^+8::SendWindowToWorkspace(8) ; Ctrl+Shift+8 hotkey to send active window to workspace 8
 ^+9::SendWindowToWorkspace(9) ; Ctrl+Shift+9 hotkey to send active window to workspace 9
+
+; Ctrl+Shift+Alt+0 through Ctrl+Shift+Alt+9 for sending active window to workspaces 10-19
+^+!0::SendWindowToWorkspace(10) ; Ctrl+Shift+Alt+0 hotkey to send active window to workspace 10
+^+!1::SendWindowToWorkspace(11) ; Ctrl+Shift+Alt+1 hotkey to send active window to workspace 11
+^+!2::SendWindowToWorkspace(12) ; Ctrl+Shift+Alt+2 hotkey to send active window to workspace 12
+^+!3::SendWindowToWorkspace(13) ; Ctrl+Shift+Alt+3 hotkey to send active window to workspace 13
+^+!4::SendWindowToWorkspace(14) ; Ctrl+Shift+Alt+4 hotkey to send active window to workspace 14
+^+!5::SendWindowToWorkspace(15) ; Ctrl+Shift+Alt+5 hotkey to send active window to workspace 15
+^+!6::SendWindowToWorkspace(16) ; Ctrl+Shift+Alt+6 hotkey to send active window to workspace 16
+^+!7::SendWindowToWorkspace(17) ; Ctrl+Shift+Alt+7 hotkey to send active window to workspace 17
+^+!8::SendWindowToWorkspace(18) ; Ctrl+Shift+Alt+8 hotkey to send active window to workspace 18
+^+!9::SendWindowToWorkspace(19) ; Ctrl+Shift+Alt+9 hotkey to send active window to workspace 19
 
 ; Ctrl+0 to toggle workspace overlays and monitor border
 ^0::ToggleBordersAndOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays and monitor border

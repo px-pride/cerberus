@@ -2359,18 +2359,8 @@ ShowWorkspaceMapDialog() {
         sortedWorkspaces.Push(workspaceID)
     }
     
-    ; Simple bubble sort for numeric sorting
-    loop sortedWorkspaces.Length - 1 {
-        i := A_Index
-        loop sortedWorkspaces.Length - i {
-            j := A_Index
-            if (sortedWorkspaces[j] > sortedWorkspaces[j + 1]) {
-                temp := sortedWorkspaces[j]
-                sortedWorkspaces[j] := sortedWorkspaces[j + 1]
-                sortedWorkspaces[j + 1] := temp
-            }
-        }
-    }
+    ; Use built-in Sort method with numeric comparison
+    sortedWorkspaces := sortedWorkspaces.Sort("N")
     
     ; Display windows by workspace
     for workspaceID in sortedWorkspaces {

@@ -56,11 +56,26 @@ InitializeWorkspaces() {
     }
 
     LogMessage("Found " validWindows.Length " valid windows to track")
+    
+    ; Try to load saved workspace state
+    stateLoaded := LoadWorkspaceState()
+    if (stateLoaded) {
+        LogMessage("Loaded saved workspace state")
+    }
 
     ; Second pass - assign valid windows to workspaces
     for hwnd in validWindows { ; Iterates through the array of window handles that passed validation
         title := WinGetTitle(hwnd)
         class := WinGetClass(hwnd)
+        
+        ; Check if this window already has a workspace assignment from loaded state
+        if (WindowWorkspaces.Has(hwnd)) {
+            workspaceID := WindowWorkspaces[hwnd]
+            SaveWindowLayout(hwnd, workspaceID)  ; Still save the layout
+            LogMessage("Window already assigned to workspace " workspaceID " from saved state: " title)
+            assignedCount++
+            continue
+        }
 
         ; Check if window is minimized - assign to workspace 0 if it is
         if (WinGetMinMax(hwnd) = -1) { ; Checks window state: -1=minimized, 0=normal, 1=maximized
@@ -82,9 +97,290 @@ InitializeWorkspaces() {
 
     LogMessage("Initialization complete: Found " windowCount " windows, " validWindows.Length " valid, assigned " assignedCount " to workspaces")
     LogMessage("============ INITIALIZATION COMPLETE ============")
+    
+    ; Arrange windows according to their workspace assignments
+    if (stateLoaded) {
+        ArrangeWindowsToWorkspaces()
+    }
+    
+    ; Save the initial workspace state
+    SaveWorkspaceState()
 
     ; Display a tray tip with the number of windows assigned
     TrayTip("Cerberus initialized", "Assigned " assignedCount " windows to workspaces") ; Shows notification in system tray
+}
+
+; ----- Persistence Functions -----
+
+SaveWorkspaceState() {
+    ; Create config directory if it doesn't exist
+    if (!DirExist(CONFIG_DIR)) {
+        try {
+            DirCreate(CONFIG_DIR)
+            LogMessage("Created config directory: " CONFIG_DIR)
+        } catch Error as err {
+            LogMessage("Error creating config directory: " err.Message)
+            return false
+        }
+    }
+    
+    ; Build a data structure to save
+    stateData := Map()
+    stateData["version"] := "1.0"
+    stateData["timestamp"] := A_Now
+    
+    ; Convert WindowWorkspaces map to saveable format
+    ; We need to save: hwnd, workspace ID, window title, window class, and exe name for validation
+    windowData := []
+    for hwnd, workspaceID in WindowWorkspaces {
+        try {
+            ; Skip if window no longer exists
+            if (!WinExist("ahk_id " hwnd))
+                continue
+                
+            ; Get window information for validation on load
+            title := WinGetTitle(hwnd)
+            class := WinGetClass(hwnd)
+            processName := WinGetProcessName(hwnd)
+            
+            ; Create window entry
+            windowEntry := Map()
+            windowEntry["hwnd"] := String(hwnd)  ; Convert to string for JSON
+            windowEntry["workspaceID"] := workspaceID
+            windowEntry["title"] := title
+            windowEntry["class"] := class
+            windowEntry["process"] := processName
+            
+            windowData.Push(windowEntry)
+        } catch Error as err {
+            LogMessage("Error getting window info for save: " err.Message)
+        }
+    }
+    
+    stateData["windows"] := windowData
+    
+    ; Convert to JSON format
+    jsonText := "{"
+    jsonText .= '"version":"' . stateData["version"] . '",'
+    jsonText .= '"timestamp":"' . stateData["timestamp"] . '",'
+    jsonText .= '"windows":['
+    
+    ; Add window entries
+    for index, window in windowData {
+        if (index > 1)
+            jsonText .= ","
+        jsonText .= '{'
+        jsonText .= '"hwnd":"' . window["hwnd"] . '",'
+        jsonText .= '"workspaceID":' . window["workspaceID"] . ','
+        jsonText .= '"title":"' . StrReplace(StrReplace(window["title"], '\', '\\'), '"', '\"') . '",'
+        jsonText .= '"class":"' . window["class"] . '",'
+        jsonText .= '"process":"' . window["process"] . '"'
+        jsonText .= '}'
+    }
+    
+    jsonText .= ']}'
+    
+    ; Write to file
+    try {
+        FileDelete(WORKSPACE_STATE_FILE)  ; Delete old file if exists
+    } catch {
+        ; File doesn't exist, that's okay
+    }
+    
+    try {
+        FileAppend(jsonText, WORKSPACE_STATE_FILE, "UTF-8")
+        LogMessage("Saved workspace state to: " WORKSPACE_STATE_FILE)
+        return true
+    } catch Error as err {
+        LogMessage("Error saving workspace state: " err.Message)
+        return false
+    }
+}
+
+LoadWorkspaceState() {
+    ; Check if state file exists
+    if (!FileExist(WORKSPACE_STATE_FILE)) {
+        LogMessage("No workspace state file found")
+        return false
+    }
+    
+    try {
+        ; Read the file
+        jsonText := FileRead(WORKSPACE_STATE_FILE, "UTF-8")
+        LogMessage("Loaded workspace state file")
+        
+        ; Parse JSON manually (AutoHotkey doesn't have built-in JSON parsing)
+        ; Extract windows array
+        windowsStart := InStr(jsonText, '"windows":[') + 11
+        windowsEnd := InStr(jsonText, ']}', , windowsStart)
+        windowsText := SubStr(jsonText, windowsStart, windowsEnd - windowsStart)
+        
+        ; Parse each window entry
+        restoredCount := 0
+        pos := 1
+        while (pos < StrLen(windowsText)) {
+            ; Find next window entry
+            entryStart := InStr(windowsText, '{', , pos)
+            if (!entryStart)
+                break
+                
+            entryEnd := InStr(windowsText, '}', , entryStart)
+            if (!entryEnd)
+                break
+                
+            entry := SubStr(windowsText, entryStart + 1, entryEnd - entryStart - 1)
+            
+            ; Extract fields
+            hwndMatch := RegExMatch(entry, '"hwnd":"(\d+)"', &hwndResult)
+            workspaceMatch := RegExMatch(entry, '"workspaceID":(\d+)', &workspaceResult)
+            titleMatch := RegExMatch(entry, '"title":"([^"]*)"', &titleResult)
+            classMatch := RegExMatch(entry, '"class":"([^"]*)"', &classResult)
+            processMatch := RegExMatch(entry, '"process":"([^"]*)"', &processResult)
+            
+            if (hwndMatch && workspaceMatch) {
+                savedHwnd := hwndResult[1]
+                workspaceID := Integer(workspaceResult[1])
+                savedTitle := titleMatch ? titleResult[1] : ""
+                savedClass := classMatch ? classResult[1] : ""
+                savedProcess := processMatch ? processResult[1] : ""
+                
+                ; Try to find matching window
+                matchedHwnd := FindMatchingWindow(savedHwnd, savedTitle, savedClass, savedProcess)
+                
+                if (matchedHwnd) {
+                    ; Restore the workspace assignment
+                    WindowWorkspaces[matchedHwnd] := workspaceID
+                    LogMessage("Restored window to workspace " workspaceID ": " savedTitle)
+                    restoredCount++
+                } else {
+                    LogMessage("Could not find matching window for: " savedTitle " (class: " savedClass ")")
+                }
+            }
+            
+            pos := entryEnd + 1
+        }
+        
+        LogMessage("Restored " restoredCount " window assignments from saved state")
+        return true
+        
+    } catch Error as err {
+        LogMessage("Error loading workspace state: " err.Message)
+        return false
+    }
+}
+
+FindMatchingWindow(savedHwnd, savedTitle, savedClass, savedProcess) {
+    ; First try the saved hwnd directly
+    try {
+        if (WinExist("ahk_id " savedHwnd)) {
+            ; Verify it's still the same window
+            currentClass := WinGetClass(savedHwnd)
+            currentProcess := WinGetProcessName(savedHwnd)
+            
+            if (currentClass = savedClass && currentProcess = savedProcess) {
+                return savedHwnd
+            }
+        }
+    } catch {
+        ; Window doesn't exist with that hwnd
+    }
+    
+    ; If direct hwnd match fails, try to find by class and process
+    if (savedClass != "" && savedProcess != "") {
+        windows := WinGetList()
+        for hwnd in windows {
+            try {
+                if (WinGetClass(hwnd) = savedClass && WinGetProcessName(hwnd) = savedProcess) {
+                    currentTitle := WinGetTitle(hwnd)
+                    
+                    ; For some applications, title might change but class/process stay same
+                    ; This is a reasonable match
+                    LogMessage("Found window by class/process match: " currentTitle)
+                    return hwnd
+                }
+            } catch {
+                ; Skip this window
+            }
+        }
+    }
+    
+    return 0  ; No match found
+}
+
+ArrangeWindowsToWorkspaces() {
+    ; This function arranges windows to their assigned workspaces after loading state
+    LogMessage("Arranging windows to their assigned workspaces...")
+    
+    arrangedCount := 0
+    minimizedCount := 0
+    
+    ; Go through all windows in WindowWorkspaces
+    for hwnd, workspaceID in WindowWorkspaces {
+        try {
+            ; Skip if window no longer exists
+            if (!WinExist("ahk_id " hwnd))
+                continue
+                
+            ; Skip unassigned windows
+            if (workspaceID = 0)
+                continue
+                
+            title := WinGetTitle(hwnd)
+            
+            ; Check if this workspace is currently visible on any monitor
+            visibleOnMonitor := 0
+            for monitorIndex, monitorWorkspace in MonitorWorkspaces {
+                if (monitorWorkspace = workspaceID) {
+                    visibleOnMonitor := monitorIndex
+                    break
+                }
+            }
+            
+            if (visibleOnMonitor > 0) {
+                ; Workspace is visible, ensure window is on the correct monitor
+                currentMonitor := GetWindowMonitor(hwnd)
+                
+                if (currentMonitor != visibleOnMonitor) {
+                    ; Window is on wrong monitor, move it
+                    ; Check if we have saved layout data
+                    if (WorkspaceLayouts.Has(workspaceID) && WorkspaceLayouts[workspaceID].Has(hwnd)) {
+                        layoutData := WorkspaceLayouts[workspaceID][hwnd]
+                        
+                        if (layoutData.Has("relX") && layoutData.Has("relY") && 
+                            layoutData.Has("relWidth") && layoutData.Has("relHeight")) {
+                            ; Use relative positioning to move window
+                            absolutePos := RelativeToAbsolutePosition(
+                                layoutData["relX"], layoutData["relY"], 
+                                layoutData["relWidth"], layoutData["relHeight"], 
+                                visibleOnMonitor)
+                            
+                            WinMove(absolutePos.x, absolutePos.y, absolutePos.width, absolutePos.height, "ahk_id " hwnd)
+                            LogMessage("Moved window to correct monitor " visibleOnMonitor ": " title)
+                            arrangedCount++
+                        }
+                    }
+                }
+                
+                ; Ensure window is not minimized if it should be visible
+                if (WinGetMinMax(hwnd) = -1) {
+                    WinRestore(hwnd)
+                    LogMessage("Restored minimized window on visible workspace: " title)
+                }
+            } else {
+                ; Workspace is not visible, minimize the window
+                if (WinGetMinMax(hwnd) != -1) {
+                    WinMinimize(hwnd)
+                    LogMessage("Minimized window on non-visible workspace " workspaceID ": " title)
+                    minimizedCount++
+                }
+            }
+            
+        } catch Error as err {
+            LogMessage("Error arranging window: " err.Message)
+        }
+    }
+    
+    LogMessage("Window arrangement complete: " arrangedCount " moved, " minimizedCount " minimized")
 }
 
 IsWindowValid(hwnd) { ; Checks if window should be tracked by Cerberus
@@ -784,6 +1080,9 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
 
 
         LogMessage("Window successfully assigned to workspace " targetWorkspaceID)
+        
+        ; Save the workspace state after successful assignment
+        SaveWorkspaceState()
 
         LogMessage("------------- SEND WINDOW TO WORKSPACE END -------------")
     } catch Error as err {
@@ -1255,6 +1554,9 @@ CleanupWindowReferences() {
     
     if (workspaceStaleCount > 0 || layoutTotalStaleCount > 0) {
         LogMessage("Cleaned up " workspaceStaleCount " workspace entries, and " layoutTotalStaleCount " layout entries")
+        
+        ; Save workspace state after cleanup
+        SaveWorkspaceState()
     }
 }
 
@@ -1320,6 +1622,9 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
                 WindowWorkspaces[hwnd] := workspaceID ; Assigns window to workspace
                 SaveWindowLayout(hwnd, workspaceID) ; Saves window layout
                 LogMessage("Window assigned in delayed check to workspace " workspaceID " on monitor " monitorIndex)
+                
+                ; Save workspace state after new assignment
+                SaveWorkspaceState()
 
                 ; Check visibility
                 currentWorkspaceID := MonitorWorkspaces[monitorIndex]
@@ -1360,6 +1665,9 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
                     WindowWorkspaces[hwnd] := workspaceID
                     SaveWindowLayout(hwnd, workspaceID)
                     LogMessage("Updated window workspace from " currentWorkspaceID " to " workspaceID " (delayed check)")
+                    
+                    ; Save workspace state after update
+                    SaveWorkspaceState()
 
                     ; Check if it needs to be minimized due to workspace mismatch
                     currentMonitorWorkspace := MonitorWorkspaces[monitorIndex]
@@ -1385,6 +1693,9 @@ AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed
             if (WinExist("ahk_id " hwnd)) {
                 WindowWorkspaces[hwnd] := 0
                 LogMessage("Assigned window to unassigned workspace (0) - monitor not tracked (delayed check)")
+                
+                ; Save workspace state after assignment
+                SaveWorkspaceState()
             }
         } catch Error as err {
             LogMessage("Error assigning window to unassigned workspace: " err.Message)
@@ -2030,6 +2341,11 @@ global LOG_TO_FILE := False  ; Set to True to log to file instead of Debug outpu
 global LOG_FILE := A_ScriptDir "\cerberus.log"  ; Path to log file
 global SHOW_WINDOW_EVENT_TOOLTIPS := False  ; Set to False to hide tooltips for window events
 global SHOW_TRAY_NOTIFICATIONS := False  ; Set to True to show tray notifications for window events
+
+; ===== PERSISTENCE SETTINGS =====
+; Configuration directory and file for saving workspace state
+global CONFIG_DIR := A_ScriptDir "\config"
+global WORKSPACE_STATE_FILE := CONFIG_DIR "\workspace_state.json"
 
 ; ===== STATE FLAGS =====
 ; Flag to prevent recursive workspace switching and handler execution

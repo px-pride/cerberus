@@ -2420,21 +2420,17 @@ ShowWorkspaceMapDialog() {
     }
     
     ; Add empty workspaces that are visible on monitors
-    loop MAX_WORKSPACES {
-        if (!workspaceMap.Has(A_Index)) {
-            ; Check if workspace is visible
-            visibleOn := ""
-            for monIndex, wsID in MonitorWorkspaces {
-                if (Integer(wsID) = Integer(A_Index)) {
-                    visibleOn .= (visibleOn = "" ? "" : ", ") . "Monitor " . monIndex
-                }
-            }
-            
-            ; Only show empty workspaces if they're actually visible on a monitor
-            if (visibleOn != "") {
-                mapText .= "`r`n========== WORKSPACE " . A_Index . " (visible on " . visibleOn . ") ==========`r`n"
-                mapText .= "  [No windows]`r`n`r`n"
-            }
+    ; First, create a set of workspaces that are actually visible
+    visibleWorkspaces := Map()
+    for monIndex, wsID in MonitorWorkspaces {
+        visibleWorkspaces[wsID] := monIndex
+    }
+    
+    ; Now show empty workspaces that are actually visible
+    for wsID, monIndex in visibleWorkspaces {
+        if (!workspaceMap.Has(wsID)) {
+            mapText .= "`r`n========== WORKSPACE " . wsID . " (visible on Monitor " . monIndex . ") ==========`r`n"
+            mapText .= "  [No windows]`r`n`r`n"
         }
     }
     

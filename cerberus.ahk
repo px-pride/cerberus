@@ -2409,48 +2409,50 @@ ShowWorkspaceMapDialog() {
             break
     }
     
-    ; Display all workspaces in sorted order
+    ; Display all workspaces in sorted order (skip unassigned for now)
     for workspaceID in sortedAllWorkspaces {
         if (workspaceID = 0) {
-            ; Handle unassigned windows
-            if (workspaceMap.Has(0) && workspaceMap[0].Length > 0) {
-                mapText .= "`r`n========== UNASSIGNED WINDOWS ==========`r`n"
-                for windowTitle in workspaceMap[0] {
-                    mapText .= "  • " . windowTitle . "`r`n"
-                }
-                mapText .= "`r`n"
+            continue  ; Skip unassigned windows, we'll show them last
+        }
+        
+        ; Check if workspace is visible on any monitor
+        visibleOn := ""
+        for monIndex, wsID in MonitorWorkspaces {
+            if (Integer(wsID) = Integer(workspaceID)) {
+                visibleOn .= (visibleOn = "" ? "" : ", ") . "Monitor " . monIndex
+            }
+        }
+        
+        ; Get windows for this workspace
+        windows := workspaceMap.Has(workspaceID) ? workspaceMap[workspaceID] : []
+        
+        ; Show workspace header
+        mapText .= "`r`n========== WORKSPACE " . workspaceID
+        if (visibleOn != "") {
+            mapText .= " (visible on " . visibleOn . ")"
+        } else {
+            mapText .= " (not visible)"
+        }
+        mapText .= " ==========`r`n"
+        
+        ; Show windows or [No windows]
+        if (windows.Length > 0) {
+            for windowTitle in windows {
+                mapText .= "  • " . windowTitle . "`r`n"
             }
         } else {
-            ; Check if workspace is visible on any monitor
-            visibleOn := ""
-            for monIndex, wsID in MonitorWorkspaces {
-                if (Integer(wsID) = Integer(workspaceID)) {
-                    visibleOn .= (visibleOn = "" ? "" : ", ") . "Monitor " . monIndex
-                }
-            }
-            
-            ; Get windows for this workspace
-            windows := workspaceMap.Has(workspaceID) ? workspaceMap[workspaceID] : []
-            
-            ; Show workspace header
-            mapText .= "`r`n========== WORKSPACE " . workspaceID
-            if (visibleOn != "") {
-                mapText .= " (visible on " . visibleOn . ")"
-            } else {
-                mapText .= " (not visible)"
-            }
-            mapText .= " ==========`r`n"
-            
-            ; Show windows or [No windows]
-            if (windows.Length > 0) {
-                for windowTitle in windows {
-                    mapText .= "  • " . windowTitle . "`r`n"
-                }
-            } else {
-                mapText .= "  [No windows]`r`n"
-            }
-            mapText .= "`r`n"
+            mapText .= "  [No windows]`r`n"
         }
+        mapText .= "`r`n"
+    }
+    
+    ; Show unassigned windows last
+    if (workspaceMap.Has(0) && workspaceMap[0].Length > 0) {
+        mapText .= "`r`n========== UNASSIGNED WINDOWS ==========`r`n"
+        for windowTitle in workspaceMap[0] {
+            mapText .= "  • " . windowTitle . "`r`n"
+        }
+        mapText .= "`r`n"
     }
     
     editControl.Text := mapText

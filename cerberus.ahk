@@ -547,8 +547,6 @@ GetActiveMonitor() { ; Gets the monitor index where the mouse cursor is located
         ; Get mouse cursor position
         MouseGetPos(&mouseX, &mouseY)
 
-        ;LogMessage("Getting active monitor for mouse position: " mouseX ", " mouseY)
-
         ; Find which monitor contains the mouse cursor
         monitorCount := MonitorGetCount()
 
@@ -2176,8 +2174,6 @@ ShowMonitorBorder(monitorIndex) { ; Shows the border for a specific monitor
             for edge, gui in edges {
                 gui.Show("NoActivate")
             }
-
-            ;;LogMessage("Showed border for monitor " monitorIndex)
         }
     } catch Error as err {
         LogMessage("Error showing monitor border: " err.Message)
@@ -2263,75 +2259,6 @@ ToggleMonitorBorders() { ; Toggles visibility of all monitor borders
 ; ====== Configuration ======
 MAX_WORKSPACES := 19  ; Maximum number of workspaces (1-19)
 MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
-
-; ====== Additional Window Handling Functions ======
-; Functions from window_monitor_fix.ahk integrated directly
-
-HandleNewWindow(hwnd) {
-    ; Validate the hwnd parameter
-    try {
-        if (!hwnd || hwnd = 0) {
-            LogMessage("HandleNewWindow: Invalid window handle (null or zero)")
-            return
-        }
-    } catch Error as err {
-        LogMessage("HandleNewWindow: Error validating handle parameter: " err.Message)
-        return
-    }
-    
-    ; Verify window still exists
-    try {
-        if (!WinExist("ahk_id " hwnd)) {
-            LogMessage("HandleNewWindow: Window " hwnd " no longer exists")
-            return
-        }
-    } catch Error as existErr {
-        LogMessage("HandleNewWindow: Error checking window existence: " existErr.Message)
-        return
-    }
-    
-    ; Get monitor index safely
-    try {
-        monitorIndex := GetWindowMonitorIndex(hwnd)
-        LogMessage("HandleNewWindow: Window is on monitor " monitorIndex)
-    } catch Error as err {
-        LogMessage("HandleNewWindow: Error getting monitor index: " err.Message)
-        monitorIndex := 1 ; Default to primary
-    }
-    
-    ; Rest of handling logic...
-}
-
-WindowCreationCheck(hwnd) {
-    ; Validate the hwnd parameter
-    try {
-        if (!hwnd || hwnd = 0) {
-            LogMessage("WindowCreationCheck: Invalid window handle (null or zero)")
-            return
-        }
-    } catch Error as err {
-        LogMessage("WindowCreationCheck: Error validating handle parameter: " err.Message)
-        return
-    }
-    
-    ; Verify window still exists
-    try {
-        if (!WinExist("ahk_id " hwnd)) {
-            LogMessage("WindowCreationCheck: Window " hwnd " no longer exists")
-            return
-        }
-    } catch Error as existErr {
-        LogMessage("WindowCreationCheck: Error checking window existence: " existErr.Message)
-        return
-    }
-    
-    ; Call HandleNewWindow safely
-    try {
-        HandleNewWindow(hwnd)
-    } catch Error as err {
-        LogMessage("WindowCreationCheck: Error in HandleNewWindow: " err.Message)
-    }
-}
 
 ; ====== Global Variables ======
 ; ===== DEBUG SETTINGS =====

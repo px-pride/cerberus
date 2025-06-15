@@ -2397,8 +2397,8 @@ ShowWorkspaceMapDialog() {
                 }
             }
             
-            ; Only show workspaces that have windows
-            if (windows.Length > 0) {
+            ; Show workspaces that have windows OR are visible on a monitor
+            if (windows.Length > 0 || visibleOn != "") {
                 mapText .= "`r`n========== WORKSPACE " . workspaceID
                 if (visibleOn != "") {
                     mapText .= " (visible on " . visibleOn . ")"
@@ -2419,7 +2419,24 @@ ShowWorkspaceMapDialog() {
         }
     }
     
-    ; Don't show empty workspaces - only show workspaces with windows
+    ; Add empty workspaces that are visible on monitors
+    loop MAX_WORKSPACES {
+        if (!workspaceMap.Has(A_Index)) {
+            ; Check if workspace is visible
+            visibleOn := ""
+            for monIndex, wsID in MonitorWorkspaces {
+                if (Integer(wsID) = Integer(A_Index)) {
+                    visibleOn .= (visibleOn = "" ? "" : ", ") . "Monitor " . monIndex
+                }
+            }
+            
+            ; Only show empty workspaces if they're actually visible on a monitor
+            if (visibleOn != "") {
+                mapText .= "`r`n========== WORKSPACE " . A_Index . " (visible on " . visibleOn . ") ==========`r`n"
+                mapText .= "  [No windows]`r`n`r`n"
+            }
+        }
+    }
     
     editControl.Text := mapText
     

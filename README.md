@@ -5,7 +5,7 @@ Cerberus is a powerful workspace management system for Windows built with AutoHo
 ## Features
 
 - **Multi-Monitor Support**: Cerberus works seamlessly across multiple monitors, allowing you to assign different workspaces to each monitor.
-- **Virtual Workspaces**: Create up to 9 virtual workspaces to organize your windows.
+- **Virtual Workspaces**: Create up to 20 virtual workspaces to organize your windows.
 - **Persistent Window Management**: Windows retain their position, size, and state when switching between workspaces.
 - **Visual Indicators**: Display workspace numbers and active monitor borders for easy navigation.
 - **Keyboard Shortcuts**: Use convenient hotkeys to switch workspaces and move windows between workspaces.
@@ -26,10 +26,10 @@ Cerberus is a powerful workspace management system for Windows built with AutoHo
 
 Cerberus uses the following keyboard shortcuts:
 
-- **Ctrl + 1-9**: Switch to workspace 1-9 on the active monitor
-- **Ctrl + Alt + 0-9**: Switch to workspace 10-19 on the active monitor
-- **Ctrl + Shift + 1-9**: Send the active window to workspace 1-9
-- **Ctrl + Shift + Alt + 0-9**: Send the active window to workspace 10-19
+- **Ctrl + 0-9**: Switch to workspace 1-10 on the active monitor
+- **Ctrl + Alt + 1-9, 0**: Switch to workspace 11-20 on the active monitor
+- **Ctrl + Shift + 0-9**: Send the active window to workspace 1-10
+- **Ctrl + Shift + Alt + 1-9, 0**: Send the active window to workspace 11-20
 - **Alt + Shift + O**: Toggle workspace number overlays and monitor border
 - **Alt + Shift + H**: Show help dialog with all keyboard shortcuts
 - **Alt + Shift + W**: Show window workspace map dialog

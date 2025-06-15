@@ -2274,10 +2274,10 @@ ShowInstructionsDialog() {
     ; Add instructions text
     dlg.SetFont("s9", "Segoe UI")
     dlg.Add("Text", "w382", "Cerberus Instructions:")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+1 through Ctrl+9 to switch to workspaces 1-9.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt+0 through Ctrl+Alt+9 to switch to workspaces 10-19.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send window to workspaces 1-9.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+Alt+[Number] to send window to workspaces 10-19.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+0 through Ctrl+9 to switch to workspaces 1-10.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt+1 through Ctrl+Alt+9, Ctrl+Alt+0 to switch to workspaces 11-20.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send window to workspaces 1-10.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+Alt+[Number] to send window to workspaces 11-20.")
     dlg.Add("Text", "w382 y+0", "Press Alt+Shift+O to toggle workspace number overlays and monitor border.")
     dlg.Add("Text", "w382 y+0", "Press Alt+Shift+R to refresh overlays when monitors are connected/disconnected.")
     dlg.Add("Text", "w382 y+0", "Press Alt+Shift+H to show this help dialog.")
@@ -2306,7 +2306,7 @@ ShowWorkspaceMapDialog() {
     
     ; Add instructions at the top
     dlg.Add("Text", "w600", "KEYBOARD SHORTCUTS:")
-    dlg.Add("Text", "w600 y+5", "• Ctrl+1-9: Switch to workspace 1-9  |  Ctrl+Alt+0-9: Switch to workspace 10-19")
+    dlg.Add("Text", "w600 y+5", "• Ctrl+0-9: Switch to workspace 1-10  |  Ctrl+Alt+1-9,0: Switch to workspace 11-20")
     dlg.Add("Text", "w600 y+0", "• Ctrl+Shift+[Number]: Send window to workspace  |  Alt+Shift+O: Toggle overlays")
     dlg.Add("Text", "w600 y+0", "• Alt+Shift+R: Refresh monitors  |  Alt+Shift+H: Help  |  Alt+Shift+W: This dialog")
     
@@ -2465,7 +2465,7 @@ ShowWorkspaceMapDialog() {
 }
 
 ; ====== Configuration ======
-MAX_WORKSPACES := 19  ; Maximum number of workspaces (1-19)
+MAX_WORKSPACES := 20  ; Maximum number of workspaces (1-20)
 MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
 
 ; ====== Global Variables ======
@@ -2644,7 +2644,7 @@ CheckMouseMovement(*) {
 }
 
 ; ====== Keyboard Shortcuts ======
-; Ctrl+1 through Ctrl+9 for switching workspaces
+; Ctrl+0 through Ctrl+9 for switching workspaces 1-10
 ^1::SwitchToWorkspace(1) ; Ctrl+1 hotkey to switch to workspace 1
 ^2::SwitchToWorkspace(2) ; Ctrl+2 hotkey to switch to workspace 2
 ^3::SwitchToWorkspace(3) ; Ctrl+3 hotkey to switch to workspace 3
@@ -2654,9 +2654,10 @@ CheckMouseMovement(*) {
 ^7::SwitchToWorkspace(7) ; Ctrl+7 hotkey to switch to workspace 7
 ^8::SwitchToWorkspace(8) ; Ctrl+8 hotkey to switch to workspace 8
 ^9::SwitchToWorkspace(9) ; Ctrl+9 hotkey to switch to workspace 9
+^0::SwitchToWorkspace(10) ; Ctrl+0 hotkey to switch to workspace 10
 
-; Ctrl+Alt+0 through Ctrl+Alt+9 for switching to workspaces 10-19
-^!0::SwitchToWorkspace(10) ; Ctrl+Alt+0 hotkey to switch to workspace 10
+; Ctrl+Alt+1 through Ctrl+Alt+9 and Ctrl+Alt+0 for switching to workspaces 11-20
+^!0::SwitchToWorkspace(20) ; Ctrl+Alt+0 hotkey to switch to workspace 20
 ^!1::SwitchToWorkspace(11) ; Ctrl+Alt+1 hotkey to switch to workspace 11
 ^!2::SwitchToWorkspace(12) ; Ctrl+Alt+2 hotkey to switch to workspace 12
 ^!3::SwitchToWorkspace(13) ; Ctrl+Alt+3 hotkey to switch to workspace 13
@@ -2667,7 +2668,7 @@ CheckMouseMovement(*) {
 ^!8::SwitchToWorkspace(18) ; Ctrl+Alt+8 hotkey to switch to workspace 18
 ^!9::SwitchToWorkspace(19) ; Ctrl+Alt+9 hotkey to switch to workspace 19
 
-; Ctrl+Shift+1 through Ctrl+Shift+9 for sending active window to workspaces
+; Ctrl+Shift+0 through Ctrl+Shift+9 for sending active window to workspaces 1-10
 ^+1::SendWindowToWorkspace(1) ; Ctrl+Shift+1 hotkey to send active window to workspace 1
 ^+2::SendWindowToWorkspace(2) ; Ctrl+Shift+2 hotkey to send active window to workspace 2
 ^+3::SendWindowToWorkspace(3) ; Ctrl+Shift+3 hotkey to send active window to workspace 3
@@ -2677,9 +2678,10 @@ CheckMouseMovement(*) {
 ^+7::SendWindowToWorkspace(7) ; Ctrl+Shift+7 hotkey to send active window to workspace 7
 ^+8::SendWindowToWorkspace(8) ; Ctrl+Shift+8 hotkey to send active window to workspace 8
 ^+9::SendWindowToWorkspace(9) ; Ctrl+Shift+9 hotkey to send active window to workspace 9
+^+0::SendWindowToWorkspace(10) ; Ctrl+Shift+0 hotkey to send active window to workspace 10
 
-; Ctrl+Shift+Alt+0 through Ctrl+Shift+Alt+9 for sending active window to workspaces 10-19
-^+!0::SendWindowToWorkspace(10) ; Ctrl+Shift+Alt+0 hotkey to send active window to workspace 10
+; Ctrl+Shift+Alt+1 through Ctrl+Shift+Alt+9 and Ctrl+Shift+Alt+0 for sending active window to workspaces 11-20
+^+!0::SendWindowToWorkspace(20) ; Ctrl+Shift+Alt+0 hotkey to send active window to workspace 20
 ^+!1::SendWindowToWorkspace(11) ; Ctrl+Shift+Alt+1 hotkey to send active window to workspace 11
 ^+!2::SendWindowToWorkspace(12) ; Ctrl+Shift+Alt+2 hotkey to send active window to workspace 12
 ^+!3::SendWindowToWorkspace(13) ; Ctrl+Shift+Alt+3 hotkey to send active window to workspace 13

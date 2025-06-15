@@ -2273,20 +2273,23 @@ ShowInstructionsDialog() {
     
     ; Add instructions text
     dlg.SetFont("s9", "Segoe UI")
-    dlg.Add("Text", "w382", "Cerberus Instructions:")
-    dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
-    dlg.Add("Text", "w382 y+0", "Active window is based on window focus.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+[Number] to switch active monitor to workspaces 1-10.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt[Number] to switch to workspaces 11-20.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send active window to workspaces 1-10.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+Alt+[Number] to send active window to workspaces 11-20.")
-    dlg.Add("Text", "w382 y+0", "Press Alt+Shift+O to toggle workspace number overlays and monitor border.")
-    dlg.Add("Text", "w382 y+0", "Press Alt+Shift+W to dosplay the current workspace status.")
-    dlg.Add("Text", "w382 y+0", "Press Alt+Shift+R to refresh overlays when monitors are connected/disconnected.")
-    dlg.Add("Text", "w382 y+0", "Press Alt+Shift+H to show this help dialog.")
+    dlg.Add("Text", "w405 y+0", "")
+    dlg.Add("Text", "w405 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
+    dlg.Add("Text", "w405 y+0", "Active window is based on window focus.")
+    dlg.Add("Text", "w405 y+0", "")
+    dlg.Add("Text", "w405 y+0", "Press Ctrl+[Number] to switch active monitor to workspaces 1-10.")
+    dlg.Add("Text", "w405 y+0", "Press Ctrl+Alt+[Number] to switch to workspaces 11-20.")
+    dlg.Add("Text", "w405 y+0", "Press Ctrl+Shift+[Number] to send active window to workspaces 1-10.")
+    dlg.Add("Text", "w405 y+0", "Press Ctrl+Shift+Alt+[Number] to send active window to workspaces 11-20.")
+    dlg.Add("Text", "w405 y+0", "")
+    dlg.Add("Text", "w405 y+0", "Press Alt+Shift+O to toggle workspace number overlays and monitor border.")
+    dlg.Add("Text", "w405 y+0", "Press Alt+Shift+W to dosplay the current workspace status.")
+    dlg.Add("Text", "w405 y+0", "Press Alt+Shift+H to show this help dialog.")
+    dlg.Add("Text", "w405 y+0", "Press Alt+Shift+R to refresh overlays to fix UI glitches.")
+    dlg.Add("Text", "w405 y+0", "(These generally occur when connecting and disconnecting monitors.)")
     
     ; Add OK button
-    buttonContainer := dlg.Add("Text", "w382 h1 Center y+15")
+    buttonContainer := dlg.Add("Text", "w405 h1 Center y+15")
     dlg.Add("Button", "Default w80 Section xp+151 yp+0", "OK").OnEvent("Click", (*) => dlg.Destroy())
     
     ; Show dialog
@@ -2598,7 +2601,7 @@ if (!A_IsAdmin) {
     MsgBox("Cerberus is not running as administrator.`n`n" .
            "Some windows (especially those from elevated applications) may not be manageable.`n`n" .
            "For best results, right-click the script and select 'Run as administrator'.",
-           "Cerberus - Administrator Warning", "Iconx")
+           "Cerberus - Administrator Warning", "Icon!")
 }
 
 ; Set up initial script environment

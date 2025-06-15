@@ -2304,14 +2304,6 @@ ShowWorkspaceMapDialog() {
     ; Make dialog larger to accommodate window list
     dlg.SetFont("s9", "Segoe UI")
     
-    ; Add instructions at the top
-    dlg.Add("Text", "w600", "KEYBOARD SHORTCUTS:")
-    dlg.Add("Text", "w600 y+5", "• Ctrl+0-9: Switch to workspace 1-10  |  Ctrl+Alt+1-9,0: Switch to workspace 11-20")
-    dlg.Add("Text", "w600 y+0", "• Ctrl+Shift+[Number]: Send window to workspace  |  Alt+Shift+O: Toggle overlays")
-    dlg.Add("Text", "w600 y+0", "• Alt+Shift+R: Refresh monitors  |  Alt+Shift+H: Help  |  Alt+Shift+W: This dialog")
-    
-    dlg.Add("Text", "w600 y+10", "WORKSPACE STATUS:")
-    
     ; Build workspace map text
     workspaceMap := Map()
     

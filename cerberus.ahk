@@ -2375,14 +2375,47 @@ ShowWorkspaceMapDialog() {
             break
     }
     
-    ; Display windows by workspace
-    for workspaceID in sortedWorkspaces {
-        windows := workspaceMap[workspaceID]
-        
+    ; Build a complete list of all workspaces to display (with windows or visible)
+    allWorkspacesToShow := Map()
+    
+    ; Add workspaces with windows
+    for workspaceID in workspaceMap {
+        allWorkspacesToShow[workspaceID] := true
+    }
+    
+    ; Add visible workspaces
+    for monIndex, wsID in MonitorWorkspaces {
+        allWorkspacesToShow[wsID] := true
+    }
+    
+    ; Sort all workspace IDs
+    sortedAllWorkspaces := []
+    for workspaceID in allWorkspacesToShow {
+        sortedAllWorkspaces.Push(workspaceID)
+    }
+    
+    ; Sort numerically
+    loop sortedAllWorkspaces.Length - 1 {
+        swapped := false
+        loop sortedAllWorkspaces.Length - A_Index {
+            if (sortedAllWorkspaces[A_Index] > sortedAllWorkspaces[A_Index + 1]) {
+                temp := sortedAllWorkspaces[A_Index]
+                sortedAllWorkspaces[A_Index] := sortedAllWorkspaces[A_Index + 1]
+                sortedAllWorkspaces[A_Index + 1] := temp
+                swapped := true
+            }
+        }
+        if (!swapped)
+            break
+    }
+    
+    ; Display all workspaces in sorted order
+    for workspaceID in sortedAllWorkspaces {
         if (workspaceID = 0) {
-            if (windows.Length > 0) {
+            ; Handle unassigned windows
+            if (workspaceMap.Has(0) && workspaceMap[0].Length > 0) {
                 mapText .= "`r`n========== UNASSIGNED WINDOWS ==========`r`n"
-                for windowTitle in windows {
+                for windowTitle in workspaceMap[0] {
                     mapText .= "  • " . windowTitle . "`r`n"
                 }
                 mapText .= "`r`n"
@@ -2391,46 +2424,32 @@ ShowWorkspaceMapDialog() {
             ; Check if workspace is visible on any monitor
             visibleOn := ""
             for monIndex, wsID in MonitorWorkspaces {
-                ; Ensure numeric comparison
                 if (Integer(wsID) = Integer(workspaceID)) {
                     visibleOn .= (visibleOn = "" ? "" : ", ") . "Monitor " . monIndex
                 }
             }
             
-            ; Show workspaces that have windows OR are visible on a monitor
-            if (windows.Length > 0 || visibleOn != "") {
-                mapText .= "`r`n========== WORKSPACE " . workspaceID
-                if (visibleOn != "") {
-                    mapText .= " (visible on " . visibleOn . ")"
-                } else {
-                    mapText .= " (not visible)"
-                }
-                mapText .= " ==========`r`n"
-                
-                if (windows.Length > 0) {
-                    for windowTitle in windows {
-                        mapText .= "  • " . windowTitle . "`r`n"
-                    }
-                } else {
-                    mapText .= "  [No windows]`r`n"
-                }
-                mapText .= "`r`n"
+            ; Get windows for this workspace
+            windows := workspaceMap.Has(workspaceID) ? workspaceMap[workspaceID] : []
+            
+            ; Show workspace header
+            mapText .= "`r`n========== WORKSPACE " . workspaceID
+            if (visibleOn != "") {
+                mapText .= " (visible on " . visibleOn . ")"
+            } else {
+                mapText .= " (not visible)"
             }
-        }
-    }
-    
-    ; Add empty workspaces that are visible on monitors
-    ; First, create a set of workspaces that are actually visible
-    visibleWorkspaces := Map()
-    for monIndex, wsID in MonitorWorkspaces {
-        visibleWorkspaces[wsID] := monIndex
-    }
-    
-    ; Now show empty workspaces that are actually visible
-    for wsID, monIndex in visibleWorkspaces {
-        if (!workspaceMap.Has(wsID)) {
-            mapText .= "`r`n========== WORKSPACE " . wsID . " (visible on Monitor " . monIndex . ") ==========`r`n"
-            mapText .= "  [No windows]`r`n`r`n"
+            mapText .= " ==========`r`n"
+            
+            ; Show windows or [No windows]
+            if (windows.Length > 0) {
+                for windowTitle in windows {
+                    mapText .= "  • " . windowTitle . "`r`n"
+                }
+            } else {
+                mapText .= "  [No windows]`r`n"
+            }
+            mapText .= "`r`n"
         }
     }
     

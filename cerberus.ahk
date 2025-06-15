@@ -2305,13 +2305,12 @@ ShowWorkspaceMapDialog() {
     dlg.SetFont("s9", "Segoe UI")
     
     ; Add instructions at the top
-    dlg.Add("Text", "w600", "=== INSTRUCTIONS ===")
-    dlg.Add("Text", "w600 y+5", "• Ctrl+1-9: Switch to workspace 1-9")
-    dlg.Add("Text", "w600 y+0", "• Ctrl+Alt+0-9: Switch to workspace 10-19")
-    dlg.Add("Text", "w600 y+0", "• Ctrl+Shift+[Number]: Send window to workspace")
-    dlg.Add("Text", "w600 y+0", "• Ctrl+0: Toggle overlays | Alt+Shift+R: Refresh | Ctrl+Alt+H: Help | Ctrl+`: This dialog")
+    dlg.Add("Text", "w600", "KEYBOARD SHORTCUTS:")
+    dlg.Add("Text", "w600 y+5", "• Ctrl+1-9: Switch to workspace 1-9  |  Ctrl+Alt+0-9: Switch to workspace 10-19")
+    dlg.Add("Text", "w600 y+0", "• Ctrl+Shift+[Number]: Send window to workspace  |  Ctrl+0: Toggle overlays")
+    dlg.Add("Text", "w600 y+0", "• Alt+Shift+R: Refresh monitors  |  Ctrl+Alt+H: Help  |  Ctrl+`: This dialog")
     
-    dlg.Add("Text", "w600 y+10", "=== CURRENT WINDOW-WORKSPACE ASSIGNMENTS ===")
+    dlg.Add("Text", "w600 y+10", "WORKSPACE STATUS:")
     
     ; Build workspace map text
     workspaceMap := Map()
@@ -2340,7 +2339,8 @@ ShowWorkspaceMapDialog() {
     }
     
     ; Create scrollable text area for window list
-    editControl := dlg.Add("Edit", "w600 h400 ReadOnly VScroll")
+    ; Use Multi option to enable proper line breaks
+    editControl := dlg.Add("Edit", "w600 h400 ReadOnly Multi VScroll")
     mapText := ""
     
     ; Add monitor workspace assignments
@@ -2380,7 +2380,7 @@ ShowWorkspaceMapDialog() {
         windows := workspaceMap[workspaceID]
         
         if (workspaceID = 0) {
-            mapText .= "UNASSIGNED WINDOWS:`n"
+            mapText .= "========== UNASSIGNED WINDOWS ==========`n"
         } else {
             ; Check if workspace is visible on any monitor
             visibleOn := ""
@@ -2390,20 +2390,26 @@ ShowWorkspaceMapDialog() {
                 }
             }
             
-            mapText .= "WORKSPACE " . workspaceID
+            mapText .= "========== WORKSPACE " . workspaceID
             if (visibleOn != "") {
                 mapText .= " (visible on " . visibleOn . ")"
+            } else {
+                mapText .= " (not visible)"
             }
-            mapText .= ":`n"
+            mapText .= " ==========`n"
         }
         
-        for windowTitle in windows {
-            mapText .= "  • " . windowTitle . "`n"
+        if (windows.Length > 0) {
+            for windowTitle in windows {
+                mapText .= "  • " . windowTitle . "`n"
+            }
+        } else {
+            mapText .= "  [No windows]`n"
         }
         mapText .= "`n"
     }
     
-    ; Add empty workspaces
+    ; Add empty workspaces that are visible on monitors
     loop MAX_WORKSPACES {
         if (!workspaceMap.Has(A_Index)) {
             ; Check if workspace is visible
@@ -2414,8 +2420,10 @@ ShowWorkspaceMapDialog() {
                 }
             }
             
+            ; Only show empty workspaces if they're actually visible on a monitor
             if (visibleOn != "") {
-                mapText .= "WORKSPACE " . A_Index . " (visible on " . visibleOn . "): [Empty]`n`n"
+                mapText .= "========== WORKSPACE " . A_Index . " (visible on " . visibleOn . ") ==========`n"
+                mapText .= "  [No windows]`n`n"
             }
         }
     }

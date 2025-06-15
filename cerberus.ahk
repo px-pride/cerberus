@@ -2274,15 +2274,16 @@ ShowInstructionsDialog() {
     ; Add instructions text
     dlg.SetFont("s9", "Segoe UI")
     dlg.Add("Text", "w382", "Cerberus Instructions:")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+0 through Ctrl+9 to switch to workspaces 1-10.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt+1 through Ctrl+Alt+9, Ctrl+Alt+0 to switch to workspaces 11-20.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send window to workspaces 1-10.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+Alt+[Number] to send window to workspaces 11-20.")
+    dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
+    dlg.Add("Text", "w382 y+0", "Active window is based on window focus.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+[Number] to switch active monitor to workspaces 1-10.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt[Number] to switch to workspaces 11-20.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send active window to workspaces 1-10.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+Alt+[Number] to send active window to workspaces 11-20.")
     dlg.Add("Text", "w382 y+0", "Press Alt+Shift+O to toggle workspace number overlays and monitor border.")
+    dlg.Add("Text", "w382 y+0", "Press Alt+Shift+W to dosplay the current workspace status.")
     dlg.Add("Text", "w382 y+0", "Press Alt+Shift+R to refresh overlays when monitors are connected/disconnected.")
     dlg.Add("Text", "w382 y+0", "Press Alt+Shift+H to show this help dialog.")
-    dlg.Add("Text", "w382 y+0", "Press Alt+Shift+W to show window workspace map.")
-    dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
     
     ; Add OK button
     buttonContainer := dlg.Add("Text", "w382 h1 Center y+15")

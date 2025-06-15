@@ -27,8 +27,13 @@ Cerberus is a powerful workspace management system for Windows built with AutoHo
 Cerberus uses the following keyboard shortcuts:
 
 - **Ctrl + 1-9**: Switch to workspace 1-9 on the active monitor
+- **Ctrl + Alt + 0-9**: Switch to workspace 10-19 on the active monitor
 - **Ctrl + Shift + 1-9**: Send the active window to workspace 1-9
+- **Ctrl + Shift + Alt + 0-9**: Send the active window to workspace 10-19
 - **Ctrl + 0**: Toggle workspace number overlays and monitor border
+- **Ctrl + Alt + H**: Show help dialog with all keyboard shortcuts
+- **Ctrl + `**: Show window workspace map dialog
+- **Alt + Shift + R**: Refresh monitor configuration and overlays
 
 ## How It Works
 

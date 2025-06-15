@@ -2,7 +2,11 @@
 #SingleInstance Force
 
 ; Cerberus - Multi-monitor workspace management system
+; Version 1.0.0
 ; To enable debug mode, change DEBUG_MODE to True below
+
+; Application version
+global APP_VERSION := "1.0.0"
 
 ; Set custom tray icon
 TraySetIcon(A_ScriptDir "\cerberus.ico")
@@ -2256,6 +2260,174 @@ ToggleMonitorBorders() { ; Toggles visibility of all monitor borders
     }
 }
 
+; ----- Dialog Functions -----
+
+ShowInstructionsDialog() {
+    ; Update window workspace assignments before showing dialog
+    CleanupWindowReferences()
+    
+    ; Create instructions dialog
+    dlg := Gui("+AlwaysOnTop +OwnDialogs")
+    dlg.Opt("+SysMenu")
+    dlg.Title := "Cerberus v" . APP_VERSION
+    
+    ; Add instructions text
+    dlg.SetFont("s9", "Segoe UI")
+    dlg.Add("Text", "w382", "Cerberus Instructions:")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+1 through Ctrl+9 to switch to workspaces 1-9.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt+0 through Ctrl+Alt+9 to switch to workspaces 10-19.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send window to workspaces 1-9.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+Alt+[Number] to send window to workspaces 10-19.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+0 to toggle workspace number overlays and monitor border.")
+    dlg.Add("Text", "w382 y+0", "Press Alt+Shift+R to refresh overlays when monitors are connected/disconnected.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt+H to show this help dialog.")
+    dlg.Add("Text", "w382 y+0", "Press Ctrl+` to show window workspace map.")
+    dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
+    
+    ; Add OK button
+    buttonContainer := dlg.Add("Text", "w382 h1 Center y+15")
+    dlg.Add("Button", "Default w80 Section xp+151 yp+0", "OK").OnEvent("Click", (*) => dlg.Destroy())
+    
+    ; Show dialog
+    dlg.Show()
+}
+
+ShowWorkspaceMapDialog() {
+    ; Update window workspace assignments before showing dialog
+    CleanupWindowReferences()
+    
+    ; Create dialog
+    dlg := Gui("+AlwaysOnTop +OwnDialogs +Resize")
+    dlg.Opt("+SysMenu")
+    dlg.Title := "Cerberus Workspace Map - v" . APP_VERSION
+    
+    ; Make dialog larger to accommodate window list
+    dlg.SetFont("s9", "Segoe UI")
+    
+    ; Add instructions at the top
+    dlg.Add("Text", "w600", "=== INSTRUCTIONS ===")
+    dlg.Add("Text", "w600 y+5", "• Ctrl+1-9: Switch to workspace 1-9")
+    dlg.Add("Text", "w600 y+0", "• Ctrl+Alt+0-9: Switch to workspace 10-19")
+    dlg.Add("Text", "w600 y+0", "• Ctrl+Shift+[Number]: Send window to workspace")
+    dlg.Add("Text", "w600 y+0", "• Ctrl+0: Toggle overlays | Alt+Shift+R: Refresh | Ctrl+Alt+H: Help | Ctrl+`: This dialog")
+    
+    dlg.Add("Text", "w600 y+10", "=== CURRENT WINDOW-WORKSPACE ASSIGNMENTS ===")
+    
+    ; Build workspace map text
+    workspaceMap := Map()
+    
+    ; Group windows by workspace
+    for hwnd, workspaceID in WindowWorkspaces {
+        try {
+            if (!WinExist("ahk_id " hwnd))
+                continue
+                
+            title := WinGetTitle(hwnd)
+            if (title = "")
+                continue
+                
+            ; Truncate long titles
+            if (StrLen(title) > 60)
+                title := SubStr(title, 1, 57) . "..."
+                
+            if (!workspaceMap.Has(workspaceID))
+                workspaceMap[workspaceID] := []
+                
+            workspaceMap[workspaceID].Push(title)
+        } catch {
+            ; Skip windows that can't be accessed
+        }
+    }
+    
+    ; Create scrollable text area for window list
+    editControl := dlg.Add("Edit", "w600 h400 ReadOnly VScroll")
+    mapText := ""
+    
+    ; Add monitor workspace assignments
+    mapText .= "MONITOR ASSIGNMENTS:`n"
+    monitorCount := MonitorGetCount()
+    loop monitorCount {
+        if (MonitorWorkspaces.Has(A_Index)) {
+            mapText .= "  Monitor " . A_Index . " → Workspace " . MonitorWorkspaces[A_Index] . "`n"
+        }
+    }
+    mapText .= "`n"
+    
+    ; Sort workspaces numerically
+    sortedWorkspaces := []
+    for workspaceID in workspaceMap {
+        sortedWorkspaces.Push(workspaceID)
+    }
+    
+    ; Custom sort function for numeric sorting
+    sortFunc := (a, b) => a - b
+    sortedWorkspaces := Array(sortedWorkspaces*)
+    
+    ; Simple bubble sort for numeric sorting
+    for i in Range(1, sortedWorkspaces.Length - 1) {
+        for j in Range(1, sortedWorkspaces.Length - i) {
+            if (sortedWorkspaces[j] > sortedWorkspaces[j + 1]) {
+                temp := sortedWorkspaces[j]
+                sortedWorkspaces[j] := sortedWorkspaces[j + 1]
+                sortedWorkspaces[j + 1] := temp
+            }
+        }
+    }
+    
+    ; Display windows by workspace
+    for workspaceID in sortedWorkspaces {
+        windows := workspaceMap[workspaceID]
+        
+        if (workspaceID = 0) {
+            mapText .= "UNASSIGNED WINDOWS:`n"
+        } else {
+            ; Check if workspace is visible on any monitor
+            visibleOn := ""
+            for monIndex, wsID in MonitorWorkspaces {
+                if (wsID = workspaceID) {
+                    visibleOn .= (visibleOn = "" ? "" : ", ") . "Monitor " . monIndex
+                }
+            }
+            
+            mapText .= "WORKSPACE " . workspaceID
+            if (visibleOn != "") {
+                mapText .= " (visible on " . visibleOn . ")"
+            }
+            mapText .= ":`n"
+        }
+        
+        for windowTitle in windows {
+            mapText .= "  • " . windowTitle . "`n"
+        }
+        mapText .= "`n"
+    }
+    
+    ; Add empty workspaces
+    loop MAX_WORKSPACES {
+        if (!workspaceMap.Has(A_Index)) {
+            ; Check if workspace is visible
+            visibleOn := ""
+            for monIndex, wsID in MonitorWorkspaces {
+                if (wsID = A_Index) {
+                    visibleOn .= (visibleOn = "" ? "" : ", ") . "Monitor " . monIndex
+                }
+            }
+            
+            if (visibleOn != "") {
+                mapText .= "WORKSPACE " . A_Index . " (visible on " . visibleOn . "): [Empty]`n`n"
+            }
+        }
+    }
+    
+    editControl.Text := mapText
+    
+    ; Add close button
+    dlg.Add("Button", "Default w80 x260 y+10", "Close").OnEvent("Click", (*) => dlg.Destroy())
+    
+    ; Show dialog
+    dlg.Show()
+}
+
 ; ====== Configuration ======
 MAX_WORKSPACES := 19  ; Maximum number of workspaces (1-19)
 MAX_MONITORS := 9    ; Maximum number of monitors (adjust as needed)
@@ -2401,33 +2573,8 @@ DetectHiddenWindows(False) ; Disables detection of hidden windows so they won't 
 InitializeWorkspaces() ; Call to initialize workspaces when script starts - sets up monitor-workspace mapping and assigns windows
 
 ; ====== Show Instructions Dialog ======
-; Start by ensuring our tray icon is correct
-TraySetIcon(A_ScriptDir "\cerberus.ico")
-
-; Create a simple dialog that looks identical to MsgBox but with our icon in the taskbar
-dlg := Gui("+AlwaysOnTop +OwnDialogs")
-dlg.Opt("+SysMenu")  ; Adds an icon to the title bar
-dlg.Title := "Cerberus"
-
-; Add the information text with exact same formatting as the MsgBox
-dlg.SetFont("s9", "Segoe UI")
-dlg.Add("Text", "w382", "Cerberus Instructions:")
-dlg.Add("Text", "w382 y+0", "Press Ctrl+1 through Ctrl+9 to switch to workspaces 1-9.")
-dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt+0 through Ctrl+Alt+9 to switch to workspaces 10-19.")
-dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send window to workspaces 1-9.")
-dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+Alt+[Number] to send window to workspaces 10-19.")
-dlg.Add("Text", "w382 y+0", "Press Ctrl+0 to toggle workspace number overlays and monitor border.")
-dlg.Add("Text", "w382 y+0", "Press Alt+Shift+R to refresh overlays when monitors are connected/disconnected.")
-dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
-dlg.Add("Text", "w382 y+0", "Press OK to continue.")
-
-; Use a simpler way to center the button with a container
-buttonContainer := dlg.Add("Text", "w382 h1 Center y+15") ; Invisible container for centering
-dlg.Add("Button", "Default w80 Section xp+151 yp+0", "OK").OnEvent("Click", (*) => dlg.Destroy())
-
-; Display the dialog
-dlg.Show()
-WinWaitClose(dlg)
+; Show the instructions dialog using the reusable function
+ShowInstructionsDialog()
 
 ; ====== Visual Elements Initialization ======
 ; Initialize visual elements only after the dialog is dismissed
@@ -2512,6 +2659,12 @@ CheckMouseMovement(*) {
 
 ; Alt+Shift+R to refresh monitor configuration
 !+r::RefreshMonitorConfiguration() ; Alt+Shift+R hotkey to refresh overlays when monitors are connected/disconnected
+
+; Ctrl+Alt+H to show help/instructions dialog
+^!h::ShowInstructionsDialog() ; Ctrl+Alt+H hotkey to show instructions dialog
+
+; Ctrl+` to show window workspace map dialog
+^`::ShowWorkspaceMapDialog() ; Ctrl+` hotkey to show window workspace map
 
 ; Function to toggle both workspace overlays and monitor borders with Ctrl+0
 ToggleBordersAndOverlays() {

@@ -2592,6 +2592,14 @@ ExitHandler(ExitReason, ExitCode) {
 }
 
 ; ====== Core Initialization ======
+; Check if running as administrator
+if (!A_IsAdmin) {
+    MsgBox("Cerberus is not running as administrator.`n`n" .
+           "Some windows (especially those from elevated applications) may not be manageable.`n`n" .
+           "For best results, right-click the script and select 'Run as administrator'.",
+           "Cerberus - Administrator Warning", "Iconx")
+}
+
 ; Set up initial script environment
 CoordMode("Mouse", "Screen") ; Sets mouse coordinates to be relative to entire screen instead of active window
 SetWinDelay(50) ; Sets a 50ms delay between window operations to improve reliability of window manipulations

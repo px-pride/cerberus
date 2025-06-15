@@ -2353,14 +2353,27 @@ ShowWorkspaceMapDialog() {
     }
     mapText .= "`n"
     
-    ; Sort workspaces numerically
+    ; Sort workspaces numerically  
     sortedWorkspaces := []
     for workspaceID in workspaceMap {
         sortedWorkspaces.Push(workspaceID)
     }
     
-    ; Use built-in Sort method with numeric comparison
-    sortedWorkspaces := sortedWorkspaces.Sort("N")
+    ; Sort the array numerically using a comparison function
+    sortedWorkspaces := sortedWorkspaces.Clone()
+    Loop sortedWorkspaces.Length - 1 {
+        swapped := false
+        Loop sortedWorkspaces.Length - A_Index {
+            if (sortedWorkspaces[A_Index] > sortedWorkspaces[A_Index + 1]) {
+                temp := sortedWorkspaces[A_Index]
+                sortedWorkspaces[A_Index] := sortedWorkspaces[A_Index + 1]
+                sortedWorkspaces[A_Index + 1] := temp
+                swapped := true
+            }
+        }
+        if (!swapped)
+            break
+    }
     
     ; Display windows by workspace
     for workspaceID in sortedWorkspaces {

@@ -30,9 +30,9 @@ Cerberus uses the following keyboard shortcuts:
 - **Ctrl + Alt + 0-9**: Switch to workspace 10-19 on the active monitor
 - **Ctrl + Shift + 1-9**: Send the active window to workspace 1-9
 - **Ctrl + Shift + Alt + 0-9**: Send the active window to workspace 10-19
-- **Ctrl + 0**: Toggle workspace number overlays and monitor border
-- **Ctrl + Alt + H**: Show help dialog with all keyboard shortcuts
-- **Ctrl + `**: Show window workspace map dialog
+- **Alt + Shift + O**: Toggle workspace number overlays and monitor border
+- **Alt + Shift + H**: Show help dialog with all keyboard shortcuts
+- **Alt + Shift + W**: Show window workspace map dialog
 - **Alt + Shift + R**: Refresh monitor configuration and overlays
 
 ## How It Works

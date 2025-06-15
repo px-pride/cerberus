@@ -2278,10 +2278,10 @@ ShowInstructionsDialog() {
     dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt+0 through Ctrl+Alt+9 to switch to workspaces 10-19.")
     dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+[Number] to send window to workspaces 1-9.")
     dlg.Add("Text", "w382 y+0", "Press Ctrl+Shift+Alt+[Number] to send window to workspaces 10-19.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+0 to toggle workspace number overlays and monitor border.")
+    dlg.Add("Text", "w382 y+0", "Press Alt+Shift+O to toggle workspace number overlays and monitor border.")
     dlg.Add("Text", "w382 y+0", "Press Alt+Shift+R to refresh overlays when monitors are connected/disconnected.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+Alt+H to show this help dialog.")
-    dlg.Add("Text", "w382 y+0", "Press Ctrl+` to show window workspace map.")
+    dlg.Add("Text", "w382 y+0", "Press Alt+Shift+H to show this help dialog.")
+    dlg.Add("Text", "w382 y+0", "Press Alt+Shift+W to show window workspace map.")
     dlg.Add("Text", "w382 y+0", "Active monitor (based on mouse position) is highlighted with a border.")
     
     ; Add OK button
@@ -2307,8 +2307,8 @@ ShowWorkspaceMapDialog() {
     ; Add instructions at the top
     dlg.Add("Text", "w600", "KEYBOARD SHORTCUTS:")
     dlg.Add("Text", "w600 y+5", "• Ctrl+1-9: Switch to workspace 1-9  |  Ctrl+Alt+0-9: Switch to workspace 10-19")
-    dlg.Add("Text", "w600 y+0", "• Ctrl+Shift+[Number]: Send window to workspace  |  Ctrl+0: Toggle overlays")
-    dlg.Add("Text", "w600 y+0", "• Alt+Shift+R: Refresh monitors  |  Ctrl+Alt+H: Help  |  Ctrl+`: This dialog")
+    dlg.Add("Text", "w600 y+0", "• Ctrl+Shift+[Number]: Send window to workspace  |  Alt+Shift+O: Toggle overlays")
+    dlg.Add("Text", "w600 y+0", "• Alt+Shift+R: Refresh monitors  |  Alt+Shift+H: Help  |  Alt+Shift+W: This dialog")
     
     dlg.Add("Text", "w600 y+10", "WORKSPACE STATUS:")
     
@@ -2690,19 +2690,19 @@ CheckMouseMovement(*) {
 ^+!8::SendWindowToWorkspace(18) ; Ctrl+Shift+Alt+8 hotkey to send active window to workspace 18
 ^+!9::SendWindowToWorkspace(19) ; Ctrl+Shift+Alt+9 hotkey to send active window to workspace 19
 
-; Ctrl+0 to toggle workspace overlays and monitor border
-^0::ToggleBordersAndOverlays() ; Ctrl+0 hotkey to show/hide workspace overlays and monitor border
+; Alt+Shift+O to toggle workspace overlays and monitor border
+!+o::ToggleBordersAndOverlays() ; Alt+Shift+O hotkey to show/hide workspace overlays and monitor border
 
 ; Alt+Shift+R to refresh monitor configuration
 !+r::RefreshMonitorConfiguration() ; Alt+Shift+R hotkey to refresh overlays when monitors are connected/disconnected
 
-; Ctrl+Alt+H to show help/instructions dialog
-^!h::ShowInstructionsDialog() ; Ctrl+Alt+H hotkey to show instructions dialog
+; Alt+Shift+H to show help/instructions dialog
+!+h::ShowInstructionsDialog() ; Alt+Shift+H hotkey to show instructions dialog
 
-; Ctrl+` to show window workspace map dialog
-^`::ShowWorkspaceMapDialog() ; Ctrl+` hotkey to show window workspace map
+; Alt+Shift+W to show window workspace map dialog
+!+w::ShowWorkspaceMapDialog() ; Alt+Shift+W hotkey to show window workspace map
 
-; Function to toggle both workspace overlays and monitor borders with Ctrl+0
+; Function to toggle both workspace overlays and monitor borders with Alt+Shift+O
 ToggleBordersAndOverlays() {
     ; Toggle workspace number overlays
     ToggleOverlays()

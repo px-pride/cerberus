@@ -2359,13 +2359,11 @@ ShowWorkspaceMapDialog() {
         sortedWorkspaces.Push(workspaceID)
     }
     
-    ; Custom sort function for numeric sorting
-    sortFunc := (a, b) => a - b
-    sortedWorkspaces := Array(sortedWorkspaces*)
-    
     ; Simple bubble sort for numeric sorting
-    for i in Range(1, sortedWorkspaces.Length - 1) {
-        for j in Range(1, sortedWorkspaces.Length - i) {
+    loop sortedWorkspaces.Length - 1 {
+        i := A_Index
+        loop sortedWorkspaces.Length - i {
+            j := A_Index
             if (sortedWorkspaces[j] > sortedWorkspaces[j + 1]) {
                 temp := sortedWorkspaces[j]
                 sortedWorkspaces[j] := sortedWorkspaces[j + 1]

@@ -2283,7 +2283,9 @@ ShowInstructionsDialog() {
     dlg.Add("Text", "w405 y+0", "Press Ctrl+Shift+Alt+[Number] to send active window to workspaces 11-20.")
     dlg.Add("Text", "w405 y+0", "")
     dlg.Add("Text", "w405 y+0", "Press Alt+Shift+O to toggle workspace number overlays and monitor border.")
-    dlg.Add("Text", "w405 y+0", "Press Alt+Shift+W to dosplay the current workspace status.")
+    dlg.Add("Text", "w405 y+0", "Press Alt+Shift+W to display the current workspace status.")
+    dlg.Add("Text", "w405 y+0", "Press Alt+Shift+S to save the current workspace assignments.")
+    dlg.Add("Text", "w405 y+0", "Press Alt+Shift+T to tile all windows on the active monitor.")
     dlg.Add("Text", "w405 y+0", "Press Alt+Shift+H to show this help dialog.")
     dlg.Add("Text", "w405 y+0", "Press Alt+Shift+R to refresh overlays to fix UI glitches.")
     dlg.Add("Text", "w405 y+0", "(These generally occur when connecting and disconnecting monitors.)")
@@ -2520,6 +2522,14 @@ ExitHandler(ExitReason, ExitCode) {
     SCRIPT_EXITING := True
 
     LogMessage("===== SCRIPT EXITING (" ExitReason ") =====")
+    
+    ; Save workspace state before exiting
+    try {
+        SaveWorkspaceState()
+        LogMessage("Workspace state saved on exit")
+    } catch Error as err {
+        LogMessage("Error saving workspace state on exit: " err.Message)
+    }
 
     ; Stop all timers
     SetTimer(CleanupWindowReferences, 0)
@@ -2708,6 +2718,21 @@ CheckMouseMovement(*) {
 ; Alt+Shift+W to show window workspace map dialog
 !+w::ShowWorkspaceMapDialog() ; Alt+Shift+W hotkey to show window workspace map
 
+; Alt+Shift+S to manually save workspace state
+!+s::ManualSaveWorkspaceState() ; Alt+Shift+S hotkey to manually save workspace state
+
+; Alt+Shift+T to tile windows on active monitor
+!+t::TileWindowsOnActiveMonitor() ; Alt+Shift+T hotkey to tile all windows on active monitor
+
+; Function to manually save workspace state with user feedback
+ManualSaveWorkspaceState() {
+    if (SaveWorkspaceState()) {
+        TrayTip("Current window assignments have been saved.", "Workspace State Saved")
+    } else {
+        TrayTip("Failed to save workspace state. Check log for details.", "Save Failed")
+    }
+}
+
 ; Function to toggle both workspace overlays and monitor borders with Alt+Shift+O
 ToggleBordersAndOverlays() {
     ; Toggle workspace number overlays
@@ -2715,4 +2740,121 @@ ToggleBordersAndOverlays() {
 
     ; Toggle monitor borders separately
     ToggleMonitorBorders()
+}
+
+; Function to tile all windows on the active monitor
+TileWindowsOnActiveMonitor() {
+    global MonitorWorkspaces, WindowWorkspaces
+    
+    ; Get the active monitor
+    activeMonitor := GetActiveMonitor()
+    LogMessage("Tiling windows on monitor " activeMonitor)
+    
+    ; Get the current workspace on the active monitor
+    currentWorkspaceID := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 1
+    LogMessage("Current workspace on active monitor: " currentWorkspaceID)
+    
+    ; Get monitor work area (excluding taskbar)
+    MonitorGetWorkArea(activeMonitor, &monLeft, &monTop, &monRight, &monBottom)
+    monWidth := monRight - monLeft
+    monHeight := monBottom - monTop
+    
+    ; Collect all valid windows on the current workspace
+    windowsToTile := []
+    
+    for hwnd, workspaceID in WindowWorkspaces {
+        ; Skip windows not on current workspace
+        if (workspaceID != currentWorkspaceID)
+            continue
+            
+        ; Skip if window doesn't exist
+        if (!WinExist("ahk_id " hwnd))
+            continue
+            
+        ; Skip minimized windows
+        if (WinGetMinMax(hwnd) = -1)
+            continue
+            
+        ; Skip if window is not on the active monitor
+        if (GetWindowMonitor(hwnd) != activeMonitor)
+            continue
+            
+        windowsToTile.Push(hwnd)
+    }
+    
+    windowCount := windowsToTile.Length
+    LogMessage("Found " windowCount " windows to tile")
+    
+    if (windowCount = 0) {
+        TrayTip("No windows to tile on this workspace", "Tiling")
+        return
+    }
+    
+    ; Determine grid layout
+    cols := Ceil(Sqrt(windowCount))
+    rows := Ceil(windowCount / cols)
+    
+    ; Calculate window dimensions
+    windowWidth := monWidth / cols
+    windowHeight := monHeight / rows
+    
+    ; Tile the windows
+    windowIndex := 0
+    Loop rows {
+        row := A_Index - 1
+        Loop cols {
+            col := A_Index - 1
+            windowIndex++
+            
+            if (windowIndex > windowCount)
+                break
+                
+            hwnd := windowsToTile[windowIndex]
+            
+            ; Calculate position
+            x := monLeft + (col * windowWidth)
+            y := monTop + (row * windowHeight)
+            
+            ; Adjust dimensions for the last row/column to fill any gaps
+            width := windowWidth
+            height := windowHeight
+            
+            ; If it's the last column in a row, extend to the right edge
+            if (col = cols - 1 || windowIndex = windowCount) {
+                width := monRight - x
+            }
+            
+            ; If it's the last row, extend to the bottom edge
+            if (row = rows - 1) {
+                height := monBottom - y
+            }
+            
+            ; Restore window if maximized
+            if (WinGetMinMax(hwnd) = 1) {
+                WinRestore("ahk_id " hwnd)
+                Sleep(30)
+            }
+            
+            ; Move and resize the window
+            try {
+                WinMove(x, y, width, height, "ahk_id " hwnd)
+                LogMessage("Tiled window " windowIndex " to x=" x " y=" y " w=" width " h=" height)
+            } catch Error as err {
+                LogMessage("Error tiling window: " err.Message)
+            }
+        }
+        
+        if (windowIndex >= windowCount)
+            break
+    }
+    
+    ; Save the new layouts
+    for hwnd in windowsToTile {
+        SaveWindowLayout(hwnd, currentWorkspaceID)
+    }
+    
+    ; Save workspace state
+    SaveWorkspaceState()
+    
+    TrayTip("Tiled " windowCount " windows on monitor " activeMonitor, "Tiling Complete")
 }

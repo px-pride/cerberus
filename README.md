@@ -33,6 +33,8 @@ Cerberus uses the following keyboard shortcuts:
 - **Alt + Shift + O**: Toggle workspace number overlays and monitor border
 - **Alt + Shift + H**: Show help dialog with all keyboard shortcuts
 - **Alt + Shift + W**: Show window workspace map dialog
+- **Alt + Shift + S**: Save current workspace assignments
+- **Alt + Shift + T**: Tile all windows on the active monitor
 - **Alt + Shift + R**: Refresh monitor configuration and overlays
 
 ## How It Works

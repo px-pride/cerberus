@@ -907,33 +907,77 @@ LogMessage(message) {
 
 ; ----- Event Handlers -----
 
-; Helper function for delayed window checking
-DelayedWindowCheck(hwnd, *) {
+; Update window workspace assignments based on current state
+UpdateWindowWorkspaces() {
     ; Reference global variables
-    global SCRIPT_EXITING
-    ; Skip if script is exiting
-    if (SCRIPT_EXITING) {
-        LogMessage("Script is exiting, ignoring delayed window check")
-        return
-    }
-
-    ; Only call AssignNewWindow if window is still valid
-    try {
-        ; More careful check for window existence to avoid errors
+    global WindowWorkspaces, MonitorWorkspaces, WorkspaceLayouts
+    
+    LogMessage("Updating window workspace assignments...")
+    
+    ; Get all open windows
+    windows := WinGetList()
+    updatedCount := 0
+    unassignedCount := 0
+    
+    ; Process each window
+    for hwnd in windows {
+        ; Skip invalid windows
+        if (!IsWindowValid(hwnd))
+            continue
+            
+        ; Get window state and monitor
         try {
-            if (WinExist("ahk_id " hwnd))
-                AssignNewWindow(hwnd)
-            else
-                LogMessage("Skipping delayed assignment for window " hwnd " - no longer exists")
-        } catch Error as existErr {
-            LogMessage("Error checking window existence in DelayedWindowCheck: " existErr.Message)
+            windowState := WinGetMinMax(hwnd)
+            windowMonitor := GetWindowMonitor(hwnd)
+            title := WinGetTitle(hwnd)
+            
+            ; Get current workspace assignment
+            currentWorkspaceID := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
+            
+            ; Check if window is minimized
+            if (windowState = -1) {
+                ; Window is minimized - unassign it from workspace
+                if (currentWorkspaceID != 0) {
+                    WindowWorkspaces[hwnd] := 0
+                    LogMessage("Unassigned minimized window from workspace " currentWorkspaceID ": " title)
+                    unassignedCount++
+                }
+            } else {
+                ; Window is not minimized - assign to its monitor's workspace
+                if (MonitorWorkspaces.Has(windowMonitor)) {
+                    targetWorkspaceID := MonitorWorkspaces[windowMonitor]
+                    
+                    ; Update if workspace assignment changed
+                    if (currentWorkspaceID != targetWorkspaceID) {
+                        WindowWorkspaces[hwnd] := targetWorkspaceID
+                        SaveWindowLayout(hwnd, targetWorkspaceID)
+                        LogMessage("Updated window from workspace " currentWorkspaceID " to " targetWorkspaceID " on monitor " windowMonitor ": " title)
+                        updatedCount++
+                    }
+                } else {
+                    ; Monitor not tracked - unassign window
+                    if (currentWorkspaceID != 0) {
+                        WindowWorkspaces[hwnd] := 0
+                        LogMessage("Unassigned window on untracked monitor: " title)
+                        unassignedCount++
+                    }
+                }
+            }
+        } catch Error as err {
+            LogMessage("Error processing window: " err.Message)
         }
-    } catch Error as err {
-        LogMessage("Error in delayed window assignment timer: " err.Message)
+    }
+    
+    if (updatedCount > 0 || unassignedCount > 0) {
+        LogMessage("Updated " updatedCount " windows, unassigned " unassignedCount " windows")
+        SaveWorkspaceState()
     }
 }
 
 SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified workspace
+    ; Update window workspace assignments first
+    UpdateWindowWorkspaces()
+    
     ; Reference global variables
     global SWITCH_IN_PROGRESS, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
 
@@ -1096,6 +1140,9 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
 }
 
 SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
+    ; Update window workspace assignments first
+    UpdateWindowWorkspaces()
+    
     ; Reference global variables
     global SWITCH_IN_PROGRESS, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
 
@@ -1562,148 +1609,6 @@ CleanupWindowReferences() {
     }
 }
 
-AssignNewWindow(hwnd) { ; Assigns a new window to appropriate workspace (delayed follow-up check)
-    ; Reference global variables
-    global MonitorWorkspaces, WindowWorkspaces
-
-    ; Validate the hwnd parameter
-    try {
-        if (!hwnd || hwnd = 0) {
-            LogMessage("AssignNewWindow: Invalid window handle (null or zero)")
-            return
-        }
-    } catch Error as err {
-        LogMessage("AssignNewWindow: Error validating handle parameter: " err.Message)
-        return
-    }
-
-    ; Verify window still exists
-    try {
-        if (!WinExist("ahk_id " hwnd)) {
-            LogMessage("AssignNewWindow: Window " hwnd " no longer exists")
-            return
-        }
-    } catch Error as existErr {
-        LogMessage("AssignNewWindow: Error checking window existence: " existErr.Message)
-        return
-    }
-
-    ; Check again if the window exists and is valid - it might have closed already
-    if (!IsWindowValid(hwnd)) {
-        LogMessage("AssignNewWindow: Window " hwnd " is not valid")
-        return
-    }
-
-    ; Get window info safely
-    try {
-        title := WinGetTitle("ahk_id " hwnd)
-        class := WinGetClass("ahk_id " hwnd)
-
-        LogMessage("Follow-up check for window - Title: " title ", Class: " class ", hwnd: " hwnd)
-    } catch Error as err {
-        LogMessage("Error getting window info in delayed check: " err.Message)
-        return
-    }
-
-    ; Check the window's current monitor (it may have moved since initial creation)
-    try {
-        monitorIndex := GetWindowMonitor(hwnd) ; Gets which monitor the window is on now
-        LogMessage("Window is now on monitor: " monitorIndex)
-    } catch Error as err {
-        LogMessage("Error getting window monitor in delayed check: " err.Message)
-        return
-    }
-
-    if (MonitorWorkspaces.Has(monitorIndex)) { ; Checks if monitor has assigned workspace
-        workspaceID := MonitorWorkspaces[monitorIndex] ; Gets workspace ID for this monitor
-
-        ; Check if this window already has a workspace assignment
-        if (!WindowWorkspaces.Has(hwnd)) {
-            try {
-                ; Window was not assigned in initial handler - assign it now
-                WindowWorkspaces[hwnd] := workspaceID ; Assigns window to workspace
-                SaveWindowLayout(hwnd, workspaceID) ; Saves window layout
-                LogMessage("Window assigned in delayed check to workspace " workspaceID " on monitor " monitorIndex)
-                
-                ; Save workspace state after new assignment
-                SaveWorkspaceState()
-
-                ; Check visibility
-                currentWorkspaceID := MonitorWorkspaces[monitorIndex]
-                if (workspaceID != currentWorkspaceID) {
-                    try {
-                        WinMinimize("ahk_id " hwnd)
-                        LogMessage("Minimized window belonging to non-visible workspace (delayed check)")
-                    } catch Error as minErr {
-                        LogMessage("Error minimizing window in delayed check: " minErr.Message)
-                    }
-                }
-            } catch Error as err {
-                LogMessage("Error assigning window in delayed check: " err.Message)
-            }
-        } else {
-            try {
-                ; Verify the window still exists again before updating
-                try {
-                    if (!WinExist("ahk_id " hwnd)) {
-                        LogMessage("AssignNewWindow: Window disappeared during processing")
-                        return
-                    }
-                } catch Error as existErr {
-                    LogMessage("AssignNewWindow: Error rechecking window: " existErr.Message)
-                    return
-                }
-
-                ; Window already has workspace assignment, but may need updating if it moved monitors
-                currentWorkspaceID := WindowWorkspaces[hwnd]
-                
-                ; IMPORTANT: Always save the layout, even for existing windows
-                ; This ensures we always have layout data for relative positioning
-                SaveWindowLayout(hwnd, currentWorkspaceID)
-                LogMessage("Updated layout for existing window in workspace " currentWorkspaceID)
-
-                ; If window's current workspace doesn't match its monitor's workspace, update it
-                if (currentWorkspaceID != workspaceID) {
-                    WindowWorkspaces[hwnd] := workspaceID
-                    SaveWindowLayout(hwnd, workspaceID)
-                    LogMessage("Updated window workspace from " currentWorkspaceID " to " workspaceID " (delayed check)")
-                    
-                    ; Save workspace state after update
-                    SaveWorkspaceState()
-
-                    ; Check if it needs to be minimized due to workspace mismatch
-                    currentMonitorWorkspace := MonitorWorkspaces[monitorIndex]
-                    if (workspaceID != currentMonitorWorkspace) {
-                        try {
-                            if (WinGetMinMax("ahk_id " hwnd) != -1) {
-                                WinMinimize("ahk_id " hwnd)
-                                LogMessage("Minimized moved window for workspace consistency (delayed check)")
-                            }
-                        } catch Error as minErr {
-                            LogMessage("Error handling window minimization: " minErr.Message)
-                        }
-                    }
-                }
-            } catch Error as err {
-                LogMessage("Error updating window workspace in delayed check: " err.Message)
-            }
-        }
-    } else {
-        ; Default to unassigned if monitor has no workspace
-        try {
-            ; Verify window still exists
-            if (WinExist("ahk_id " hwnd)) {
-                WindowWorkspaces[hwnd] := 0
-                LogMessage("Assigned window to unassigned workspace (0) - monitor not tracked (delayed check)")
-                
-                ; Save workspace state after assignment
-                SaveWorkspaceState()
-            }
-        } catch Error as err {
-            LogMessage("Error assigning window to unassigned workspace: " err.Message)
-        }
-    }
-}
 
 ; ----- Overlay Functions -----
 
@@ -1732,6 +1637,9 @@ InitializeOverlays() { ; Creates and displays workspace number indicators and mo
 }
 
 RefreshMonitorConfiguration() { ; Refreshes overlays and monitor workspaces when monitors are connected/disconnected
+    ; Update window workspace assignments first
+    UpdateWindowWorkspaces()
+    
     ; Reference global variables
     global MonitorWorkspaces, WorkspaceOverlays, BorderOverlay, BORDER_VISIBLE, LAST_ACTIVE_MONITOR, MAX_WORKSPACES
     
@@ -2264,7 +2172,7 @@ ToggleMonitorBorders() { ; Toggles visibility of all monitor borders
 
 ShowInstructionsDialog() {
     ; Update window workspace assignments before showing dialog
-    CleanupWindowReferences()
+    UpdateWindowWorkspaces()
     
     ; Create instructions dialog
     dlg := Gui("+AlwaysOnTop +OwnDialogs")
@@ -2300,7 +2208,7 @@ ShowInstructionsDialog() {
 
 ShowWorkspaceMapDialog() {
     ; Update window workspace assignments before showing dialog
-    CleanupWindowReferences()
+    UpdateWindowWorkspaces()
     
     ; Create dialog
     dlg := Gui("+AlwaysOnTop +OwnDialogs +Resize")
@@ -2517,6 +2425,9 @@ OnExit(ExitHandler)
 
 ExitHandler(ExitReason, ExitCode) {
     global SCRIPT_EXITING, WorkspaceOverlays, WindowListOverlay, WindowListVisible
+    
+    ; Update window workspace assignments before exiting
+    UpdateWindowWorkspaces()
 
     ; Set flag to prevent handlers from running during exit
     SCRIPT_EXITING := True
@@ -2726,6 +2637,9 @@ CheckMouseMovement(*) {
 
 ; Function to manually save workspace state with user feedback
 ManualSaveWorkspaceState() {
+    ; Update window workspace assignments first
+    UpdateWindowWorkspaces()
+    
     if (SaveWorkspaceState()) {
         TrayTip("Current window assignments have been saved.", "Workspace State Saved")
     } else {
@@ -2735,6 +2649,9 @@ ManualSaveWorkspaceState() {
 
 ; Function to toggle both workspace overlays and monitor borders with Alt+Shift+O
 ToggleBordersAndOverlays() {
+    ; Update window workspace assignments first
+    UpdateWindowWorkspaces()
+    
     ; Toggle workspace number overlays
     ToggleOverlays()
 
@@ -2744,6 +2661,9 @@ ToggleBordersAndOverlays() {
 
 ; Function to tile all windows on the active monitor
 TileWindowsOnActiveMonitor() {
+    ; Update window workspace assignments first
+    UpdateWindowWorkspaces()
+    
     global MonitorWorkspaces, WindowWorkspaces
     
     ; Get the active monitor

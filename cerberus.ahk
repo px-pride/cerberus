@@ -914,6 +914,12 @@ UpdateWindowWorkspaces() {
     
     LogMessage("Updating window workspace assignments...")
     
+    ; First, build a list of currently visible workspaces
+    visibleWorkspaces := Map()
+    for monitorIndex, workspaceID in MonitorWorkspaces {
+        visibleWorkspaces[workspaceID] := monitorIndex
+    }
+    
     ; Get all open windows
     windows := WinGetList()
     updatedCount := 0
@@ -936,12 +942,13 @@ UpdateWindowWorkspaces() {
             
             ; Check if window is minimized
             if (windowState = -1) {
-                ; Window is minimized - unassign it from workspace
-                if (currentWorkspaceID != 0) {
+                ; Window is minimized - only unassign if it's in a visible workspace
+                if (currentWorkspaceID != 0 && visibleWorkspaces.Has(currentWorkspaceID)) {
                     WindowWorkspaces[hwnd] := 0
-                    LogMessage("Unassigned minimized window from workspace " currentWorkspaceID ": " title)
+                    LogMessage("Unassigned minimized window from visible workspace " currentWorkspaceID ": " title)
                     unassignedCount++
                 }
+                ; If minimized but in a non-visible workspace, leave it assigned
             } else {
                 ; Window is not minimized - assign to its monitor's workspace
                 if (MonitorWorkspaces.Has(windowMonitor)) {
@@ -975,9 +982,6 @@ UpdateWindowWorkspaces() {
 }
 
 SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified workspace
-    ; Update window workspace assignments first
-    UpdateWindowWorkspaces()
-    
     ; Reference global variables
     global SWITCH_IN_PROGRESS, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
 
@@ -994,6 +998,9 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
     ; Set the flag to indicate operation is in progress
     SWITCH_IN_PROGRESS := True
 
+    ; Update window workspace assignments first
+    UpdateWindowWorkspaces()
+    
     try {
         ; Log the start of window movement
         LogMessage("------------- SEND WINDOW TO WORKSPACE START -------------")
@@ -1140,9 +1147,6 @@ SendWindowToWorkspace(targetWorkspaceID) { ; Sends active window to specified wo
 }
 
 SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
-    ; Update window workspace assignments first
-    UpdateWindowWorkspaces()
-    
     ; Reference global variables
     global SWITCH_IN_PROGRESS, MAX_WORKSPACES, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
 
@@ -1159,6 +1163,9 @@ SwitchToWorkspace(requestedID) { ; Changes active workspace on current monitor
     ; Set the flag to indicate switch is in progress
     SWITCH_IN_PROGRESS := True
 
+    ; Update window workspace assignments first
+    UpdateWindowWorkspaces()
+    
     try {
         ; Log the start of workspace switching
         LogMessage("------------- WORKSPACE SWITCH START -------------")

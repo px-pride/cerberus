@@ -914,14 +914,11 @@ LoadWorkspaceState() {
 ShowInstructions() {
     instructionText := "
     (
-Cerberus v" VERSION " (cerberus4.ahk) - Multi-Monitor Workspace Manager
 
 CONCEPTS:
 • Active Monitor: The monitor where your mouse cursor is located
 • Active Window: The window that currently has focus
 • Workspace: A numbered group of windows (1-20) that appear together
-
-KEYBOARD SHORTCUTS:
 
 Workspace Switching (changes workspace on active monitor):
 • Ctrl+1-9: Switch to workspaces 1-9
@@ -942,10 +939,6 @@ Utility Functions:
 • Alt+Shift+T: Tile windows on active monitor
 • Alt+Shift+H: Show this help
 • Alt+Shift+R: Refresh monitor configuration
-
-VISUAL INDICATORS:
-• Workspace numbers shown in corner of each monitor
-• Cyan border around active monitor (where mouse is)
     )"
     
     MsgBox(instructionText, "Cerberus Instructions", "OK")
@@ -1030,6 +1023,7 @@ ToggleOverlays() {
         }
         BorderOverlay.Clear()
     } else {
+        LAST_ACTIVE_MONITOR := 0
         UpdateWorkspaceOverlays()
         UpdateActiveMonitorBorder()
     }

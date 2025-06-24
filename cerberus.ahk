@@ -183,7 +183,8 @@ RelativeToAbsolutePosition(layout, monitorIndex) {
 UpdateWindowMaps() {
     global MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
     
-    LogDebug("UpdateWindowMaps called")
+    LogDebug("UpdateWindowMaps: Called - Stack trace:")
+    LogDebug("  Called from: " A_LineFile ":" A_LineNumber)
     
     monitorCount := MonitorGetCount()
     Loop monitorCount {
@@ -249,6 +250,8 @@ UpdateWindowMaps() {
                 }
                 
                 if (!WindowWorkspaces.Has(hwnd) || WindowWorkspaces[hwnd] != activeWorkspace) {
+                    oldWorkspace := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : "none"
+                    LogDebug("UpdateWindowMaps: Assigning window " hwnd " from workspace " oldWorkspace " to " activeWorkspace)
                     WindowWorkspaces[hwnd] := activeWorkspace
                     
                     if (!WorkspaceLayouts.Has(activeWorkspace)) {
@@ -626,6 +629,12 @@ SendWindowToWorkspace(targetWorkspace) {
         }
         
         WindowWorkspaces[hwnd] := targetWorkspace
+        try {
+            title := WinGetTitle(hwnd)
+            LogDebug("SendWindowToWorkspace: Moved window '" title "' (hwnd: " hwnd ") to workspace " targetWorkspace)
+        } catch {
+            LogDebug("SendWindowToWorkspace: Moved window hwnd " hwnd " to workspace " targetWorkspace)
+        }
         
         if (!WorkspaceLayouts.Has(targetWorkspace)) {
             WorkspaceLayouts[targetWorkspace] := Map()
@@ -773,6 +782,8 @@ TileWindows() {
 SaveWorkspaceState() {
     global CONFIG_DIR, WORKSPACE_STATE_FILE, WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces
     
+    LogDebug("SaveWorkspaceState: Called - WindowWorkspaces has " WindowWorkspaces.Count " windows")
+    
     if (!DirExist(CONFIG_DIR)) {
         DirCreate(CONFIG_DIR)
     }
@@ -788,6 +799,7 @@ SaveWorkspaceState() {
         state.monitors[monitor] := workspace
     }
     
+    ; Save assigned windows
     for hwnd, workspace in WindowWorkspaces {
         try {
             windowData := {
@@ -808,6 +820,41 @@ SaveWorkspaceState() {
         }
     }
     
+    ; Save unassigned windows
+    windows := WinGetList()
+    for hwnd in windows {
+        if (IsValidWindow(hwnd) && !WindowWorkspaces.Has(hwnd)) {
+            try {
+                windowData := {
+                    hwnd: hwnd,
+                    workspace: 0,  ; 0 indicates unassigned
+                    title: WinGetTitle(hwnd),
+                    class: WinGetClass(hwnd),
+                    process: WinGetProcessName(hwnd)
+                }
+                
+                ; Get current position for unassigned windows
+                WinGetPos(&x, &y, &w, &h, hwnd)
+                currentMonitor := GetMonitorForWindow(hwnd)
+                relPos := AbsoluteToRelativePosition(x, y, w, h, currentMonitor)
+                
+                windowData.layout := {
+                    xPercent: relPos.xPercent,
+                    yPercent: relPos.yPercent,
+                    widthPercent: relPos.widthPercent,
+                    heightPercent: relPos.heightPercent,
+                    monitor: currentMonitor,
+                    state: WinGetMinMax(hwnd)
+                }
+                
+                state.windows.Push(windowData)
+                LogDebug("SaveWorkspaceState: Saved unassigned window '" windowData.title "'")
+            } catch {
+                LogDebug("Error saving unassigned window: " hwnd)
+            }
+        }
+    }
+    
     try {
         json := Jxon_Dump(state, 2)
         if (FileExist(WORKSPACE_STATE_FILE)) {
@@ -823,8 +870,10 @@ SaveWorkspaceState() {
 LoadWorkspaceState() {
     global WORKSPACE_STATE_FILE, WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces
     
+    LogDebug("LoadWorkspaceState: Called")
+    
     if (!FileExist(WORKSPACE_STATE_FILE)) {
-        LogDebug("No saved workspace state found")
+        LogDebug("LoadWorkspaceState: No saved workspace state found")
         return false
     }
     
@@ -849,33 +898,59 @@ LoadWorkspaceState() {
         }
         
         if (stateData.HasOwnProp("windows")) {
+            ; Track which windows have been matched to prevent duplicates
+            matchedWindows := Map()
+            
             for windowData in stateData.windows {
                 found := false
                 
                 windows := WinGetList()
                 for hwnd in windows {
+                    ; Skip if already matched
+                    if (matchedWindows.Has(hwnd)) {
+                        continue
+                    }
+                    
                     try {
-                        if (WinGetClass(hwnd) == windowData.class && 
-                            WinGetProcessName(hwnd) == windowData.process) {
+                        currentTitle := WinGetTitle(hwnd)
+                        currentClass := WinGetClass(hwnd)
+                        currentProcess := WinGetProcessName(hwnd)
+                        
+                        if (currentClass == windowData.class && 
+                            currentTitle == windowData.title &&
+                            currentProcess == windowData.process) {
                             
-                            WindowWorkspaces[hwnd] := windowData.workspace
-                            
-                            if (windowData.HasOwnProp("layout")) {
-                                if (!WorkspaceLayouts.Has(windowData.workspace)) {
-                                    WorkspaceLayouts[windowData.workspace] := Map()
+                            ; Only add to WindowWorkspaces if it has a workspace assignment
+                            if (windowData.workspace > 0) {
+                                WindowWorkspaces[hwnd] := windowData.workspace
+                                LogDebug("LoadWorkspaceState: Matched window " hwnd " '" windowData.title "' to workspace " windowData.workspace)
+                                
+                                if (windowData.HasOwnProp("layout")) {
+                                    if (!WorkspaceLayouts.Has(windowData.workspace)) {
+                                        WorkspaceLayouts[windowData.workspace] := Map()
+                                    }
+                                    WorkspaceLayouts[windowData.workspace][hwnd] := windowData.layout
                                 }
-                                WorkspaceLayouts[windowData.workspace][hwnd] := windowData.layout
+                            } else {
+                                LogDebug("LoadWorkspaceState: Matched unassigned window " hwnd " '" windowData.title "'")
                             }
                             
+                            matchedWindows[hwnd] := true
                             found := true
+                            LogDebug("Restored window: " windowData.title " to workspace " windowData.workspace)
                             break
+                        } else if (currentClass == windowData.class && currentProcess == windowData.process) {
+                            ; Log near-misses where class and process match but title differs
+                            LogDebug("LoadWorkspaceState: Near-miss for " windowData.title)
+                            LogDebug("  Saved title: '" windowData.title "'")
+                            LogDebug("  Current title: '" currentTitle "'")
                         }
                     } catch {
                     }
                 }
                 
                 if (!found) {
-                    LogDebug("Window not found: " windowData.title)
+                    LogDebug("Window not found: '" windowData.title "' (class: " windowData.class ", process: " windowData.process ")")
                 }
             }
         }
@@ -902,7 +977,30 @@ LoadWorkspaceState() {
             }
         }
         
-        LogDebug("Workspace state loaded")
+        LogDebug("LoadWorkspaceState: Successfully loaded - WindowWorkspaces has " WindowWorkspaces.Count " windows")
+        
+        ; Log windows on hidden workspaces
+        hiddenCount := 0
+        for hwnd, wsId in WindowWorkspaces {
+            isVisible := false
+            for monIdx, monWsId in MonitorWorkspaces {
+                if (monWsId == wsId) {
+                    isVisible := true
+                    break
+                }
+            }
+            if (!isVisible) {
+                hiddenCount++
+                try {
+                    title := WinGetTitle(hwnd)
+                    LogDebug("LoadWorkspaceState: Window on hidden workspace " wsId ": " title)
+                } catch {
+                    LogDebug("LoadWorkspaceState: Window on hidden workspace " wsId ": hwnd " hwnd)
+                }
+            }
+        }
+        LogDebug("LoadWorkspaceState: " hiddenCount " windows on hidden workspaces")
+        
         return true
         
     } catch as e {
@@ -990,6 +1088,28 @@ ShowWorkspaceMap() {
         }
     }
     
+    ; Add unassigned windows section
+    mapText .= "`nUNASSIGNED WINDOWS:`n`n"
+    unassignedCount := 0
+    windows := WinGetList()
+    for hwnd in windows {
+        if (IsValidWindow(hwnd) && !WindowWorkspaces.Has(hwnd)) {
+            try {
+                title := WinGetTitle(hwnd)
+                if (StrLen(title) > 50) {
+                    title := SubStr(title, 1, 47) "..."
+                }
+                mapText .= "  - " title "`n"
+                unassignedCount++
+            } catch {
+            }
+        }
+    }
+    
+    if (unassignedCount == 0) {
+        mapText .= "  (none)`n"
+    }
+    
     mapWindow := Gui("+Resize", "Workspace Map")
     mapWindow.SetFont("s10", "Consolas")
     textCtrl := mapWindow.Add("Edit", "ReadOnly w600 h400", mapText)
@@ -998,7 +1118,7 @@ ShowWorkspaceMap() {
 }
 
 ToggleOverlays() {
-    global BORDER_VISIBLE, WorkspaceOverlays, BorderOverlay
+    global BORDER_VISIBLE, WorkspaceOverlays, BorderOverlay, LAST_ACTIVE_MONITOR
     
     UpdateWindowMaps()
     
@@ -1076,6 +1196,7 @@ RefreshMonitors() {
 CleanupWindowReferences() {
     global WindowWorkspaces, WorkspaceLayouts
     
+    LogDebug("CleanupWindowReferences: Called")
     windowsToRemove := []
     
     for hwnd, _ in WindowWorkspaces {

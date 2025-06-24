@@ -186,6 +186,27 @@ UpdateWindowMaps() {
     LogDebug("UpdateWindowMaps: Called - Stack trace:")
     LogDebug("  Called from: " A_LineFile ":" A_LineNumber)
     
+    ; Log windows on hidden workspaces before processing
+    hiddenWindowCount := 0
+    for hwnd, wsId in WindowWorkspaces {
+        isHidden := true
+        for monIdx, monWsId in MonitorWorkspaces {
+            if (monWsId == wsId) {
+                isHidden := false
+                break
+            }
+        }
+        if (isHidden) {
+            try {
+                title := WinGetTitle(hwnd)
+                LogDebug("UpdateWindowMaps: Window on hidden workspace " wsId " BEFORE processing: " title)
+                hiddenWindowCount++
+            } catch {
+            }
+        }
+    }
+    LogDebug("UpdateWindowMaps: " hiddenWindowCount " windows on hidden workspaces before processing")
+    
     monitorCount := MonitorGetCount()
     Loop monitorCount {
         monitorIndex := A_Index
@@ -251,6 +272,13 @@ UpdateWindowMaps() {
                 
                 if (!WindowWorkspaces.Has(hwnd) || WindowWorkspaces[hwnd] != activeWorkspace) {
                     oldWorkspace := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : "none"
+                    try {
+                        windowTitle := WinGetTitle(hwnd)
+                        if (InStr(windowTitle, "Claude") && InStr(windowTitle, "Libertarian")) {
+                            LogDebug("UpdateWindowMaps: CLAUDE WINDOW DETECTED - About to reassign from workspace " oldWorkspace " to " activeWorkspace)
+                        }
+                    } catch {
+                    }
                     LogDebug("UpdateWindowMaps: Assigning window " hwnd " from workspace " oldWorkspace " to " activeWorkspace)
                     WindowWorkspaces[hwnd] := activeWorkspace
                     
@@ -898,11 +926,13 @@ LoadWorkspaceState() {
         }
         
         if (stateData.HasOwnProp("windows")) {
+            LogDebug("LoadWorkspaceState: Found " stateData.windows.Length " windows in saved state")
             ; Track which windows have been matched to prevent duplicates
             matchedWindows := Map()
             
             for windowData in stateData.windows {
                 found := false
+                LogDebug("LoadWorkspaceState: Processing saved window - Title: '" windowData.title "', Workspace: " windowData.workspace ", Process: " windowData.process)
                 
                 windows := WinGetList()
                 for hwnd in windows {
@@ -924,6 +954,18 @@ LoadWorkspaceState() {
                             if (windowData.workspace > 0) {
                                 WindowWorkspaces[hwnd] := windowData.workspace
                                 LogDebug("LoadWorkspaceState: Matched window " hwnd " '" windowData.title "' to workspace " windowData.workspace)
+                                
+                                ; Check if this is a hidden workspace
+                                isHiddenWorkspace := true
+                                for monIdx, monWsId in MonitorWorkspaces {
+                                    if (monWsId == windowData.workspace) {
+                                        isHiddenWorkspace := false
+                                        break
+                                    }
+                                }
+                                if (isHiddenWorkspace) {
+                                    LogDebug("LoadWorkspaceState: Window is on HIDDEN workspace " windowData.workspace)
+                                }
                                 
                                 if (windowData.HasOwnProp("layout")) {
                                     if (!WorkspaceLayouts.Has(windowData.workspace)) {

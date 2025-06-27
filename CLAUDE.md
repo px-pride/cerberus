@@ -2,96 +2,105 @@
 
 The purpose of this CLAUDE.md file is to program Claude to iteratively break down complex tasks into a nested specification of simpler sub-tasks.
 
+## Basic Regulations
+
+Clean up obsolete code.
+Clean up unused variables, functions, classes, imports, etc.
+Do NOT maintain backward compatibility unless otherwise instructed.
+Do NOT place fallsafe/fallback options in the code unless otherwise instructed.
+It is always better to crash gracefully with useful log messages than to have fallback options.
+Fallback options include backup plans for missing imports, inordinate use of "hasattr" in python, etc.
+
+NEVER ADD FALLBACK CODE. NO EXCEPTIONS. This includes:
+- No fallback window restoration
+- No fallback error handling that tries alternative approaches
+- No "at least try to..." code
+- Let things fail with proper error messages instead
+
 ## Specification Examples
 
 These are examples of specifications are referred to in the main protocol below.
 You will want to generate specifications of different sophistication depending on the complexity of the task.
 Here are several examples of specifications of avrying complexitiy.
+
 <example1>
 <simple_query>
 {prompt}
 </simple_query>
-
 Answer directly and concisely.
 Provide only essential information.
 Use plain language.
 </example1>
+
 <example2>
 <quick_answer>
 {prompt}
 </quick_answer>
-
 <answer>
 - Identify the core question
 - Provide a clear, direct response
 - Use simple examples if needed
 </answer>
 </example2>
+
 <example3>
 <standard_request>
 {prompt}
 </standard_request>
-
 <clarify>
 - Identify what's being asked
 - Note any ambiguities
 </clarify>
-
 <respond>
 - Provide a structured answer
 - Include relevant examples
 - Address main aspects of the question
 </respond>
 </example3>
+
 <example4>
 <analytical_task>
 {prompt}
 </analytical_task>
-
 <understand>
 - Define the problem clearly
 - Identify key components
 - Note constraints and requirements
 </understand>
-
 <analyze>
 - Break down the problem
 - Consider multiple approaches
 - Evaluate options systematically
 </analyze>
-
 <conclude>
 - Present the best solution
 - Justify your reasoning
 - Note any important limitations
 </conclude>
 </example4>
+
 <example5>
 <professional_task>
 {prompt}
 </professional_task>
-
 <scope>
 - Define the task parameters
 - Identify deliverables and success criteria
 - Note constraints and dependencies
 - Clarify assumptions
 </scope>
-
 <plan>
 - Outline a methodical approach
 - Break down into logical steps
 - Address potential challenges
 - Establish evaluation criteria
 </plan>
-
 <execute>
 - Implement the plan systematically
 - Make evidence-based decisions
 - Document key considerations
 - Apply best practices
 </execute>
-
 <deliver>
 - Present comprehensive results
 - Verify against requirements
@@ -99,6 +108,7 @@ Use plain language.
 - Suggest next steps
 </deliver>
 </example5>
+
 <example6>
 <comprehensive_project>
 {prompt}
@@ -152,6 +162,7 @@ Follow all phases in sequence, completing each thoroughly before proceeding.
 Document your process extensively throughout.
 Maintain professional standards in all aspects of the work.
 </example6>
+
 <example7>
 <enterprise_solution>
 {prompt}

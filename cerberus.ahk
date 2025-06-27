@@ -169,11 +169,21 @@ RelativeToAbsolutePosition(layout, monitorIndex) {
     monitorWidth := right - left
     monitorHeight := bottom - top
     
-    return {
-        x: left + (layout["xPercent"] * monitorWidth),
-        y: top + (layout["yPercent"] * monitorHeight),
-        width: layout["widthPercent"] * monitorWidth,
-        height: layout["heightPercent"] * monitorHeight
+    ; Handle both Map (from JSON) and Object (from AbsoluteToRelativePosition)
+    if (layout is Map) {
+        return {
+            x: left + (layout["xPercent"] * monitorWidth),
+            y: top + (layout["yPercent"] * monitorHeight),
+            width: layout["widthPercent"] * monitorWidth,
+            height: layout["heightPercent"] * monitorHeight
+        }
+    } else {
+        return {
+            x: left + (layout.xPercent * monitorWidth),
+            y: top + (layout.yPercent * monitorHeight),
+            width: layout.widthPercent * monitorWidth,
+            height: layout.heightPercent * monitorHeight
+        }
     }
 }
 
@@ -531,18 +541,36 @@ SwitchWorkspace(targetWorkspace) {
                 for hwnd, layout in WorkspaceLayouts[targetWorkspace] {
                     try {
                         if (WinExist(hwnd)) {
+                            ; Check if window needs to be moved to active monitor
+                            windowMonitor := GetMonitorForWindow(hwnd)
+                            
+                            ; Calculate position on active monitor
                             absPos := RelativeToAbsolutePosition(layout, activeMonitor)
                             
-                            if (layout.state == 1) {
+                            ; Handle both Map (from JSON) and Object
+                            state := (layout is Map) ? layout["state"] : layout.state
+                            
+                            if (state == 1) {
                                 WinRestore(hwnd)
+                                
+                                ; If on different monitor, move first then maximize
+                                if (windowMonitor != activeMonitor) {
+                                    WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                                    Sleep(30)
+                                }
+                                
                                 WinMaximize(hwnd)
                             } else {
                                 WinRestore(hwnd)
                                 WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
                             }
+                            
+                            if (windowMonitor != activeMonitor) {
+                                LogDebug("Moved window from monitor " windowMonitor " to monitor " activeMonitor ": " WinGetTitle(hwnd))
+                            }
                         }
-                    } catch {
-                        LogDebug("Error restoring window: " hwnd)
+                    } catch as e {
+                        LogDebug("Error restoring window: " hwnd " - " e.Message)
                     }
                 }
             }
@@ -1007,7 +1035,9 @@ LoadWorkspaceState() {
                         if (WinExist(hwnd)) {
                             absPos := RelativeToAbsolutePosition(layout, monIdx)
                             
-                            if (layout["state"] == 1) {
+                            ; Handle both Map (from JSON) and Object
+                            state := (layout is Map) ? layout["state"] : layout.state
+                            if (state == 1) {
                                 WinRestore(hwnd)
                                 WinMaximize(hwnd)
                             } else {

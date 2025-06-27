@@ -11,6 +11,12 @@ Do NOT place fallsafe/fallback options in the code unless otherwise instructed.
 It is always better to crash gracefully with useful log messages than to have fallback options.
 Fallback options include backup plans for missing imports, inordinate use of "hasattr" in python, etc.
 
+NEVER ADD FALLBACK CODE. NO EXCEPTIONS. This includes:
+- No fallback window restoration
+- No fallback error handling that tries alternative approaches
+- No "at least try to..." code
+- Let things fail with proper error messages instead
+
 ## Specification Examples
 
 These are examples of specifications are referred to in the main protocol below.

@@ -1,9 +1,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
-#Warn All
 
 TraySetIcon("cerberus.ico")
-A_MenuMaskKey := "vkFF"
 
 global VERSION := "1.0.0"
 global MAX_WORKSPACES := 20
@@ -14,7 +12,6 @@ global LOGS_DIR := A_ScriptDir "\logs"
 global LOG_FILE := ""
 global SHOW_WINDOW_EVENT_TOOLTIPS := True
 global SHOW_TRAY_NOTIFICATIONS := True
-global SHOW_DIALOG_BOXES := False
 
 global CONFIG_DIR := A_ScriptDir "\config"
 global WORKSPACE_STATE_FILE := CONFIG_DIR "\workspace_state.json"
@@ -173,10 +170,10 @@ RelativeToAbsolutePosition(layout, monitorIndex) {
     monitorHeight := bottom - top
     
     return {
-        x: left + (layout.xPercent * monitorWidth),
-        y: top + (layout.yPercent * monitorHeight),
-        width: layout.widthPercent * monitorWidth,
-        height: layout.heightPercent * monitorHeight
+        x: left + (layout["xPercent"] * monitorWidth),
+        y: top + (layout["yPercent"] * monitorHeight),
+        width: layout["widthPercent"] * monitorWidth,
+        height: layout["heightPercent"] * monitorHeight
     }
 }
 
@@ -270,18 +267,27 @@ UpdateWindowMaps() {
                     continue
                 }
                 
-                if (!WindowWorkspaces.Has(hwnd) || WindowWorkspaces[hwnd] != activeWorkspace) {
-                    oldWorkspace := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : "none"
-                    try {
-                        windowTitle := WinGetTitle(hwnd)
-                        if (InStr(windowTitle, "Claude") && InStr(windowTitle, "Libertarian")) {
-                            LogDebug("UpdateWindowMaps: CLAUDE WINDOW DETECTED - About to reassign from workspace " oldWorkspace " to " activeWorkspace)
-                        }
-                    } catch {
-                    }
-                    LogDebug("UpdateWindowMaps: Assigning window " hwnd " from workspace " oldWorkspace " to " activeWorkspace)
+                if (!WindowWorkspaces.Has(hwnd)) {
+                    LogDebug("UpdateWindowMaps: Assigning new window " hwnd " to workspace " activeWorkspace)
                     WindowWorkspaces[hwnd] := activeWorkspace
                     
+                    if (!WorkspaceLayouts.Has(activeWorkspace)) {
+                        WorkspaceLayouts[activeWorkspace] := Map()
+                    }
+                    
+                    WinGetPos(&x, &y, &w, &h, hwnd)
+                    relPos := AbsoluteToRelativePosition(x, y, w, h, monitorIndex)
+                    
+                    WorkspaceLayouts[activeWorkspace][hwnd] := {
+                        xPercent: relPos.xPercent,
+                        yPercent: relPos.yPercent,
+                        widthPercent: relPos.widthPercent,
+                        heightPercent: relPos.heightPercent,
+                        monitor: monitorIndex,
+                        state: minMax
+                    }
+                } else if (WindowWorkspaces[hwnd] == activeWorkspace) {
+                    ; Update layout for windows already on this workspace
                     if (!WorkspaceLayouts.Has(activeWorkspace)) {
                         WorkspaceLayouts[activeWorkspace] := Map()
                     }
@@ -827,7 +833,16 @@ SaveWorkspaceState() {
         state.monitors[monitor] := workspace
     }
     
-    ; Save assigned windows
+    ; Get windows in Z-order (top to bottom)
+    windowsInZOrder := WinGetList()
+    zOrderMap := Map()
+    
+    ; Create Z-order index for each window
+    for index, hwnd in windowsInZOrder {
+        zOrderMap[hwnd] := index
+    }
+    
+    ; Save assigned windows with Z-order
     for hwnd, workspace in WindowWorkspaces {
         try {
             windowData := {
@@ -838,48 +853,19 @@ SaveWorkspaceState() {
                 process: WinGetProcessName(hwnd)
             }
             
+            ; Add Z-order if available
+            if (zOrderMap.Has(hwnd)) {
+                windowData.zOrder := zOrderMap[hwnd]
+            }
+            
             if (WorkspaceLayouts.Has(workspace) && WorkspaceLayouts[workspace].Has(hwnd)) {
                 windowData.layout := WorkspaceLayouts[workspace][hwnd]
             }
             
             state.windows.Push(windowData)
+            LogDebug("SaveWorkspaceState: Saved window '" windowData.title "' to workspace " workspace)
         } catch {
             LogDebug("Error saving window state: " hwnd)
-        }
-    }
-    
-    ; Save unassigned windows
-    windows := WinGetList()
-    for hwnd in windows {
-        if (IsValidWindow(hwnd) && !WindowWorkspaces.Has(hwnd)) {
-            try {
-                windowData := {
-                    hwnd: hwnd,
-                    workspace: 0,  ; 0 indicates unassigned
-                    title: WinGetTitle(hwnd),
-                    class: WinGetClass(hwnd),
-                    process: WinGetProcessName(hwnd)
-                }
-                
-                ; Get current position for unassigned windows
-                WinGetPos(&x, &y, &w, &h, hwnd)
-                currentMonitor := GetMonitorForWindow(hwnd)
-                relPos := AbsoluteToRelativePosition(x, y, w, h, currentMonitor)
-                
-                windowData.layout := {
-                    xPercent: relPos.xPercent,
-                    yPercent: relPos.yPercent,
-                    widthPercent: relPos.widthPercent,
-                    heightPercent: relPos.heightPercent,
-                    monitor: currentMonitor,
-                    state: WinGetMinMax(hwnd)
-                }
-                
-                state.windows.Push(windowData)
-                LogDebug("SaveWorkspaceState: Saved unassigned window '" windowData.title "'")
-            } catch {
-                LogDebug("Error saving unassigned window: " hwnd)
-            }
         }
     }
     
@@ -907,7 +893,23 @@ LoadWorkspaceState() {
     
     try {
         jsonStr := FileRead(WORKSPACE_STATE_FILE)
+        LogDebug("LoadWorkspaceState: Read JSON string length: " StrLen(jsonStr))
+        
+        ; Log first 200 chars of JSON for debugging
+        LogDebug("LoadWorkspaceState: JSON preview: " SubStr(jsonStr, 1, 200))
+        
         stateData := Jxon_Load(&jsonStr)
+        
+        LogDebug("LoadWorkspaceState: JSON parsed successfully")
+        LogDebug("LoadWorkspaceState: stateData type: " Type(stateData))
+        
+        ; Better debugging of parsed object
+        if (stateData is Map) {
+            LogDebug("LoadWorkspaceState: Map has " stateData.Count " entries")
+            for key, value in stateData {
+                LogDebug("LoadWorkspaceState: Found key: " key)
+            }
+        }
         
         windows := WinGetList()
         for hwnd in windows {
@@ -919,20 +921,23 @@ LoadWorkspaceState() {
             }
         }
         
-        if (stateData.HasOwnProp("monitors")) {
-            for monIdx, wsId in stateData.monitors.OwnProps() {
+        LogDebug("LoadWorkspaceState: Checking for monitors property...")
+        if (stateData.Has("monitors")) {
+            for monIdx, wsId in stateData["monitors"] {
                 MonitorWorkspaces[Number(monIdx)] := wsId
             }
+            LogDebug("LoadWorkspaceState: Monitors loaded successfully")
         }
         
-        if (stateData.HasOwnProp("windows")) {
-            LogDebug("LoadWorkspaceState: Found " stateData.windows.Length " windows in saved state")
+        LogDebug("LoadWorkspaceState: Checking for windows property...")
+        if (stateData.Has("windows")) {
+            LogDebug("LoadWorkspaceState: Found windows array with " stateData["windows"].Length " entries")
             ; Track which windows have been matched to prevent duplicates
             matchedWindows := Map()
             
-            for windowData in stateData.windows {
+            for windowData in stateData["windows"] {
                 found := false
-                LogDebug("LoadWorkspaceState: Processing saved window - Title: '" windowData.title "', Workspace: " windowData.workspace ", Process: " windowData.process)
+                LogDebug("LoadWorkspaceState: Processing saved window - Title: '" windowData["title"] "', Workspace: " windowData["workspace"] ", Process: " windowData["process"])
                 
                 windows := WinGetList()
                 for hwnd in windows {
@@ -946,45 +951,43 @@ LoadWorkspaceState() {
                         currentClass := WinGetClass(hwnd)
                         currentProcess := WinGetProcessName(hwnd)
                         
-                        if (currentClass == windowData.class && 
-                            currentTitle == windowData.title &&
-                            currentProcess == windowData.process) {
+                        if (currentClass == windowData["class"] && 
+                            currentProcess == windowData["process"] &&
+                            (hwnd == windowData["hwnd"] || currentTitle == windowData["title"])) {
                             
-                            ; Only add to WindowWorkspaces if it has a workspace assignment
-                            if (windowData.workspace > 0) {
-                                WindowWorkspaces[hwnd] := windowData.workspace
-                                LogDebug("LoadWorkspaceState: Matched window " hwnd " '" windowData.title "' to workspace " windowData.workspace)
-                                
-                                ; Check if this is a hidden workspace
+                            ; Load all windows including unassigned (workspace 0)
+                            WindowWorkspaces[hwnd] := windowData["workspace"]
+                            LogDebug("LoadWorkspaceState: Matched window " hwnd " '" currentTitle "' to workspace " windowData["workspace"] " (saved as '" windowData["title"] "')")
+                            
+                            ; Check if this is a hidden workspace
+                            if (windowData["workspace"] > 0) {
                                 isHiddenWorkspace := true
                                 for monIdx, monWsId in MonitorWorkspaces {
-                                    if (monWsId == windowData.workspace) {
+                                    if (monWsId == windowData["workspace"]) {
                                         isHiddenWorkspace := false
                                         break
                                     }
                                 }
                                 if (isHiddenWorkspace) {
-                                    LogDebug("LoadWorkspaceState: Window is on HIDDEN workspace " windowData.workspace)
+                                    LogDebug("LoadWorkspaceState: Window is on HIDDEN workspace " windowData["workspace"])
                                 }
-                                
-                                if (windowData.HasOwnProp("layout")) {
-                                    if (!WorkspaceLayouts.Has(windowData.workspace)) {
-                                        WorkspaceLayouts[windowData.workspace] := Map()
-                                    }
-                                    WorkspaceLayouts[windowData.workspace][hwnd] := windowData.layout
+                            }
+                            
+                            if (windowData.Has("layout")) {
+                                if (!WorkspaceLayouts.Has(windowData["workspace"])) {
+                                    WorkspaceLayouts[windowData["workspace"]] := Map()
                                 }
-                            } else {
-                                LogDebug("LoadWorkspaceState: Matched unassigned window " hwnd " '" windowData.title "'")
+                                WorkspaceLayouts[windowData["workspace"]][hwnd] := windowData["layout"]
                             }
                             
                             matchedWindows[hwnd] := true
                             found := true
-                            LogDebug("Restored window: " windowData.title " to workspace " windowData.workspace)
+                            LogDebug("Restored window: " windowData["title"] " to workspace " windowData["workspace"])
                             break
-                        } else if (currentClass == windowData.class && currentProcess == windowData.process) {
+                        } else if (currentClass == windowData["class"] && currentProcess == windowData["process"]) {
                             ; Log near-misses where class and process match but title differs
-                            LogDebug("LoadWorkspaceState: Near-miss for " windowData.title)
-                            LogDebug("  Saved title: '" windowData.title "'")
+                            LogDebug("LoadWorkspaceState: Near-miss for " windowData["title"])
+                            LogDebug("  Saved title: '" windowData["title"] "'")
                             LogDebug("  Current title: '" currentTitle "'")
                         }
                     } catch {
@@ -992,7 +995,7 @@ LoadWorkspaceState() {
                 }
                 
                 if (!found) {
-                    LogDebug("Window not found: '" windowData.title "' (class: " windowData.class ", process: " windowData.process ")")
+                    LogDebug("Window not found: '" windowData["title"] "' (class: " windowData["class"] ", process: " windowData["process"] ")")
                 }
             }
         }
@@ -1004,7 +1007,7 @@ LoadWorkspaceState() {
                         if (WinExist(hwnd)) {
                             absPos := RelativeToAbsolutePosition(layout, monIdx)
                             
-                            if (layout.state == 1) {
+                            if (layout["state"] == 1) {
                                 WinRestore(hwnd)
                                 WinMaximize(hwnd)
                             } else {
@@ -1012,9 +1015,71 @@ LoadWorkspaceState() {
                                 WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
                             }
                         }
-                    } catch {
-                        LogDebug("Error restoring window: " hwnd)
+                    } catch as e {
+                        LogDebug("Error restoring window: " hwnd " - " e.Message)
                     }
+                }
+            }
+        }
+        
+        ; Restore Z-order for windows on visible workspaces
+        LogDebug("LoadWorkspaceState: Restoring Z-order")
+        windowsToReorder := []
+        
+        ; Collect windows with Z-order information
+        if (stateData.Has("windows")) {
+            for windowData in stateData["windows"] {
+                if (windowData.Has("zOrder") && WindowWorkspaces.Has(windowData["hwnd"])) {
+                    hwnd := windowData["hwnd"]
+                    workspace := WindowWorkspaces[hwnd]
+                    
+                    ; Check if this workspace is visible (assigned to a monitor)
+                    isVisible := false
+                    for monIdx, monWsId in MonitorWorkspaces {
+                        if (monWsId == workspace) {
+                            isVisible := true
+                            break
+                        }
+                    }
+                    
+                    if (isVisible && WinExist(hwnd)) {
+                        windowsToReorder.Push({hwnd: hwnd, zOrder: windowData["zOrder"]})
+                    }
+                }
+            }
+        }
+        
+        ; Sort windows by Z-order (lower number = higher in stack)
+        if (windowsToReorder.Length > 0) {
+            ; Manual sort since AHK v2 doesn't have built-in array sort
+            Loop windowsToReorder.Length - 1 {
+                i := A_Index
+                Loop windowsToReorder.Length - i {
+                    j := i + A_Index
+                    if (windowsToReorder[i].zOrder > windowsToReorder[j].zOrder) {
+                        temp := windowsToReorder[i]
+                        windowsToReorder[i] := windowsToReorder[j]
+                        windowsToReorder[j] := temp
+                    }
+                }
+            }
+            
+            ; Activate windows in reverse order (bottom to top) to restore stacking
+            Loop windowsToReorder.Length {
+                i := windowsToReorder.Length - A_Index + 1
+                try {
+                    WinActivate(windowsToReorder[i].hwnd)
+                    LogDebug("LoadWorkspaceState: Restored Z-order for window " windowsToReorder[i].hwnd)
+                } catch {
+                    LogDebug("LoadWorkspaceState: Failed to restore Z-order for window " windowsToReorder[i].hwnd)
+                }
+            }
+            
+            ; Activate the topmost window last
+            if (windowsToReorder.Length > 0) {
+                try {
+                    WinActivate(windowsToReorder[1].hwnd)
+                } catch {
                 }
             }
         }
@@ -1046,7 +1111,8 @@ LoadWorkspaceState() {
         return true
         
     } catch as e {
-        LogDebug("Error loading workspace state: " e.Message)
+        LogDebug("LoadWorkspaceState: Exception caught - Type: " Type(e) " Message: " e.Message)
+        LogDebug("LoadWorkspaceState: Stack: " e.Stack)
         return false
     }
 }
@@ -1061,14 +1127,14 @@ CONCEPTS:
 • Workspace: A numbered group of windows (1-20) that appear together
 
 Workspace Switching (changes workspace on active monitor):
-• Ctrl+1-9: Switch to workspaces 1-9
-• Ctrl+0: Switch to workspace 10
+• Alt+1-9: Switch to workspaces 1-9
+• Alt+0: Switch to workspace 10
 • Ctrl+Alt+1-9: Switch to workspaces 11-19
 • Ctrl+Alt+0: Switch to workspace 20
 
 Window Sending (moves active window to workspace):
-• Ctrl+Shift+1-9: Send to workspaces 1-9
-• Ctrl+Shift+0: Send to workspace 10
+• Alt+Shift+1-9: Send to workspaces 1-9
+• Alt+Shift+0: Send to workspace 10
 • Ctrl+Shift+Alt+1-9: Send to workspaces 11-19
 • Ctrl+Shift+Alt+0: Send to workspace 20
 
@@ -1135,7 +1201,7 @@ ShowWorkspaceMap() {
     unassignedCount := 0
     windows := WinGetList()
     for hwnd in windows {
-        if (IsValidWindow(hwnd) && !WindowWorkspaces.Has(hwnd)) {
+        if (IsValidWindow(hwnd) && (!WindowWorkspaces.Has(hwnd) || WindowWorkspaces[hwnd] == 0)) {
             try {
                 title := WinGetTitle(hwnd)
                 if (StrLen(title) > 50) {
@@ -1219,8 +1285,6 @@ RefreshMonitors() {
     
     LogDebug("RefreshMonitors: MonitorWorkspaces now has " MonitorWorkspaces.Count " entries")
     
-    UpdateWindowMaps()
-    
     ; Ensure at least one monitor is initialized
     if (MonitorWorkspaces.Count == 0 && monitorCount > 0) {
         LogDebug("RefreshMonitors: No monitors initialized, forcing monitor 1")
@@ -1298,8 +1362,10 @@ Initialize() {
     
     LogDebug("Initialize: Starting Cerberus initialization")
     
-    if (!IsAdmin() && SHOW_DIALOG_BOXES) {
-        MsgBox("Warning: Running without administrator privileges.`n`nSome windows may not be manageable.", "Cerberus", "Icon!")
+    if (!IsAdmin()) {
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("Warning: Running without administrator privileges. Some windows may not be manageable.", "Cerberus", 2)
+        }
     }
     
     OnExit(ExitHandler)
@@ -1332,9 +1398,7 @@ Initialize() {
     SetTimer(CleanupWindowReferences, 120000)
     SetTimer(CheckMouseMovement, 100)
     
-    if (SHOW_DIALOG_BOXES) {
-        ShowInstructions()
-    }
+    ShowInstructions()
     
     if (SHOW_TRAY_NOTIFICATIONS) {
         TrayTip("Cerberus initialized", "Multi-monitor workspace manager ready", 1)
@@ -1344,16 +1408,16 @@ Initialize() {
     LogDebug("Running cerberus4.ahk version " VERSION)
 }
 
-^1::SwitchWorkspace(1)
-^2::SwitchWorkspace(2)
-^3::SwitchWorkspace(3)
-^4::SwitchWorkspace(4)
-^5::SwitchWorkspace(5)
-^6::SwitchWorkspace(6)
-^7::SwitchWorkspace(7)
-^8::SwitchWorkspace(8)
-^9::SwitchWorkspace(9)
-^0::SwitchWorkspace(10)
+!1::SwitchWorkspace(1)
+!2::SwitchWorkspace(2)
+!3::SwitchWorkspace(3)
+!4::SwitchWorkspace(4)
+!5::SwitchWorkspace(5)
+!6::SwitchWorkspace(6)
+!7::SwitchWorkspace(7)
+!8::SwitchWorkspace(8)
+!9::SwitchWorkspace(9)
+!0::SwitchWorkspace(10)
 
 ^!1::SwitchWorkspace(11)
 ^!2::SwitchWorkspace(12)
@@ -1366,16 +1430,16 @@ Initialize() {
 ^!9::SwitchWorkspace(19)
 ^!0::SwitchWorkspace(20)
 
-^+1::SendWindowToWorkspace(1)
-^+2::SendWindowToWorkspace(2)
-^+3::SendWindowToWorkspace(3)
-^+4::SendWindowToWorkspace(4)
-^+5::SendWindowToWorkspace(5)
-^+6::SendWindowToWorkspace(6)
-^+7::SendWindowToWorkspace(7)
-^+8::SendWindowToWorkspace(8)
-^+9::SendWindowToWorkspace(9)
-^+0::SendWindowToWorkspace(10)
+!+1::SendWindowToWorkspace(1)
+!+2::SendWindowToWorkspace(2)
+!+3::SendWindowToWorkspace(3)
+!+4::SendWindowToWorkspace(4)
+!+5::SendWindowToWorkspace(5)
+!+6::SendWindowToWorkspace(6)
+!+7::SendWindowToWorkspace(7)
+!+8::SendWindowToWorkspace(8)
+!+9::SendWindowToWorkspace(9)
+!+0::SendWindowToWorkspace(10)
 
 ^+!1::SendWindowToWorkspace(11)
 ^+!2::SendWindowToWorkspace(12)

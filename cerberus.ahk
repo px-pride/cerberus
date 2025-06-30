@@ -119,16 +119,26 @@ IsValidWindow(hwnd) {
 }
 
 GetActiveMonitor() {
+    global LAST_ACTIVE_MONITOR
+    
     CoordMode("Mouse", "Screen")
     MouseGetPos(&mx, &my)
     
     monitorCount := MonitorGetCount()
     Loop monitorCount {
-        MonitorGetWorkArea(A_Index, &left, &top, &right, &bottom)
+        ; Use MonitorGet to include taskbar area
+        MonitorGet(A_Index, &left, &top, &right, &bottom)
         if (mx >= left && mx < right && my >= top && my < bottom) {
             return A_Index
         }
     }
+    
+    ; If no monitor matched (cursor outside all monitors), return last known active monitor
+    if (LAST_ACTIVE_MONITOR > 0 && LAST_ACTIVE_MONITOR <= monitorCount) {
+        return LAST_ACTIVE_MONITOR
+    }
+    
+    ; Fallback to primary only if we have no valid last active monitor
     return MonitorGetPrimary()
 }
 
@@ -1402,6 +1412,11 @@ Initialize() {
     
     LogDebug("Initialize: Calling RefreshMonitors")
     RefreshMonitors()
+    
+    ; Initialize last active monitor
+    global LAST_ACTIVE_MONITOR
+    LAST_ACTIVE_MONITOR := GetActiveMonitor()
+    LogDebug("Initialize: Initial active monitor: " LAST_ACTIVE_MONITOR)
     
     LogDebug("Initialize: MonitorWorkspaces after RefreshMonitors: " MonitorWorkspaces.Count " monitors")
     

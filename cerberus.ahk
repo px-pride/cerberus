@@ -28,7 +28,10 @@ global MonitorWorkspaces := Map()
 global WindowWorkspaces := Map()
 global WorkspaceLayouts := Map()
 global WorkspaceOverlays := Map()
+global WorkspaceNameOverlays := Map()
 global BorderOverlay := Map()
+global WorkspaceNames := Map()
+global WindowZOrder := Map()
 
 global SWITCH_IN_PROGRESS := False
 global SCRIPT_EXITING := False
@@ -251,12 +254,6 @@ UpdateWindowMaps() {
                         windowsToRemove.Push(hwnd)
                         continue
                     }
-                    
-                    currentMonitor := GetMonitorForWindow(hwnd)
-                    if (currentMonitor != monitorIndex) {
-                        windowsToRemove.Push(hwnd)
-                        continue
-                    }
                 } catch {
                     windowsToRemove.Push(hwnd)
                 }
@@ -396,6 +393,87 @@ CreateWorkspaceOverlay(monitorIndex, workspaceId) {
     ; Store both overlays
     WorkspaceOverlays[monitorIndex] := {border: borderGui, main: mainOverlay}
     LogDebug("CreateWorkspaceOverlay: Overlay created and shown at x=" x " y=" y " for monitor " monitorIndex)
+    
+    ; Create name overlay if workspace has a name
+    CreateWorkspaceNameOverlay(monitorIndex, workspaceId)
+}
+
+CreateWorkspaceNameOverlay(monitorIndex, workspaceId) {
+    global WorkspaceNameOverlays, WorkspaceNames, OVERLAY_MARGIN, OVERLAY_OPACITY, BORDER_COLOR, BORDER_THICKNESS
+    
+    ; Destroy existing name overlay if any
+    if (WorkspaceNameOverlays.Has(monitorIndex)) {
+        try {
+            if (WorkspaceNameOverlays[monitorIndex].HasOwnProp("border") && WorkspaceNameOverlays[monitorIndex].border) {
+                WorkspaceNameOverlays[monitorIndex].border.Destroy()
+            }
+            if (WorkspaceNameOverlays[monitorIndex].HasOwnProp("main") && WorkspaceNameOverlays[monitorIndex].main) {
+                WorkspaceNameOverlays[monitorIndex].main.Destroy()
+            }
+        } catch {
+        }
+        WorkspaceNameOverlays.Delete(monitorIndex)
+    }
+    
+    ; Check if workspace has a name
+    if (!WorkspaceNames.Has(workspaceId) || WorkspaceNames[workspaceId] == "") {
+        return
+    }
+    
+    workspaceName := WorkspaceNames[workspaceId]
+    LogDebug("CreateWorkspaceNameOverlay: Creating name overlay for monitor " monitorIndex " with name: '" workspaceName "'")
+    
+    MonitorGetWorkArea(monitorIndex, &left, &top, &right, &bottom)
+    
+    ; Use a monospace font for predictable character widths
+    fontSize := 14
+    fontName := "Consolas"  ; Monospace font
+    
+    ; Calculate text dimensions using character count
+    ; For Consolas at size 14, use larger dimensions to ensure text fits
+    ; Add extra buffer to ensure no clipping occurs
+    charWidth := 10.0
+    charHeight := 21
+    calculatedTextWidth := StrLen(workspaceName) * charWidth
+    textHeight := charHeight
+    
+    ; Add padding
+    padding := 10
+    overlayWidth := Ceil(calculatedTextWidth) + padding * 2 + BORDER_THICKNESS * 2
+    overlayHeight := textHeight + padding * 2 + BORDER_THICKNESS * 2
+    
+    ; Position in lower-left corner
+    x := left + OVERLAY_MARGIN
+    y := bottom - overlayHeight - OVERLAY_MARGIN
+    
+    ; Create border overlay
+    borderGui := Gui("+AlwaysOnTop -Caption +ToolWindow")
+    borderGui.BackColor := BORDER_COLOR
+    borderGui.Show("x" x " y" y " w" overlayWidth " h" overlayHeight " NoActivate")
+    WinSetTransparent(OVERLAY_OPACITY, borderGui)
+    
+    ; Create main overlay
+    mainOverlay := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000")
+    mainOverlay.BackColor := "1E1E1E"
+    mainOverlay.MarginX := 0
+    mainOverlay.MarginY := 0
+    
+    ; Add the workspace name text with explicit dimensions and position
+    innerWidth := overlayWidth - BORDER_THICKNESS * 2
+    innerHeight := overlayHeight - BORDER_THICKNESS * 2
+    textControlWidth := innerWidth - padding * 2
+    textControlHeight := innerHeight - padding * 2
+    textCtrl := mainOverlay.Add("Text", "x" padding " y" padding " w" textControlWidth " h" textControlHeight " Left c33FFFF", workspaceName)
+    textCtrl.SetFont("s" fontSize, fontName)
+    
+    ; Show main overlay with offset for border
+    mainOverlay.Show("x" (x + BORDER_THICKNESS) " y" (y + BORDER_THICKNESS) " w" innerWidth " h" innerHeight " NoActivate")
+    WinSetTransparent(OVERLAY_OPACITY, mainOverlay)
+    
+    ; Store both overlays
+    WorkspaceNameOverlays[monitorIndex] := {border: borderGui, main: mainOverlay}
+    LogDebug("CreateWorkspaceNameOverlay: Name overlay created at x=" x " y=" y " with dimensions " overlayWidth "x" overlayHeight)
+    LogDebug("CreateWorkspaceNameOverlay: Text control width=" textControlWidth " for string length=" StrLen(workspaceName) " chars")
 }
 
 UpdateWorkspaceOverlays() {
@@ -548,36 +626,92 @@ SwitchWorkspace(targetWorkspace) {
             MonitorWorkspaces[activeMonitor] := targetWorkspace
             
             if (WorkspaceLayouts.Has(targetWorkspace)) {
+                ; Collect windows with their Z-order for proper restoration
+                windowsToRestore := []
+                
                 for hwnd, layout in WorkspaceLayouts[targetWorkspace] {
+                    if (WinExist(hwnd)) {
+                        zOrder := WindowZOrder.Has(hwnd) ? WindowZOrder[hwnd] : 999999
+                        windowsToRestore.Push({hwnd: hwnd, layout: layout, zOrder: zOrder})
+                        try {
+                            title := WinGetTitle(hwnd)
+                            LogDebug("SwitchWorkspace: Window '" title "' (hwnd: " hwnd ") has Z-order: " zOrder)
+                        } catch {
+                            LogDebug("SwitchWorkspace: Window hwnd " hwnd " has Z-order: " zOrder)
+                        }
+                    }
+                }
+                
+                ; Sort by Z-order (lower number = higher in stack)
+                if (windowsToRestore.Length > 1) {
+                    LogDebug("SwitchWorkspace: Sorting " windowsToRestore.Length " windows by Z-order")
+                    Loop windowsToRestore.Length - 1 {
+                        i := A_Index
+                        Loop windowsToRestore.Length - i {
+                            j := i + A_Index
+                            if (windowsToRestore[i].zOrder > windowsToRestore[j].zOrder) {
+                                temp := windowsToRestore[i]
+                                windowsToRestore[i] := windowsToRestore[j]
+                                windowsToRestore[j] := temp
+                            }
+                        }
+                    }
+                    ; Log sorted order
+                    LogDebug("SwitchWorkspace: Sorted window order:")
+                    for idx, win in windowsToRestore {
+                        try {
+                            title := WinGetTitle(win.hwnd)
+                            LogDebug("  " idx ": '" title "' (Z-order: " win.zOrder ")")
+                        } catch {
+                            LogDebug("  " idx ": hwnd " win.hwnd " (Z-order: " win.zOrder ")")
+                        }
+                    }
+                }
+                
+                ; Restore windows in reverse Z-order (bottom to top) to preserve stacking
+                LogDebug("SwitchWorkspace: Restoring windows in reverse order")
+                Loop windowsToRestore.Length {
+                    idx := windowsToRestore.Length - A_Index + 1
+                    hwnd := windowsToRestore[idx].hwnd
+                    layout := windowsToRestore[idx].layout
+                    
                     try {
-                        if (WinExist(hwnd)) {
-                            ; Check if window needs to be moved to active monitor
-                            windowMonitor := GetMonitorForWindow(hwnd)
+                        title := WinGetTitle(hwnd)
+                        LogDebug("SwitchWorkspace: Restoring window " idx " of " windowsToRestore.Length ": '" title "'")
+                    } catch {
+                        LogDebug("SwitchWorkspace: Restoring window " idx " of " windowsToRestore.Length ": hwnd " hwnd)
+                    }
+                    
+                    try {
+                        ; Check if window needs to be moved to active monitor
+                        windowMonitor := GetMonitorForWindow(hwnd)
+                        
+                        ; Calculate position on active monitor
+                        absPos := RelativeToAbsolutePosition(layout, activeMonitor)
+                        
+                        ; Handle both Map (from JSON) and Object
+                        state := (layout is Map) ? layout["state"] : layout.state
+                        
+                        if (state == 1) {
+                            WinRestore(hwnd)
                             
-                            ; Calculate position on active monitor
-                            absPos := RelativeToAbsolutePosition(layout, activeMonitor)
-                            
-                            ; Handle both Map (from JSON) and Object
-                            state := (layout is Map) ? layout["state"] : layout.state
-                            
-                            if (state == 1) {
-                                WinRestore(hwnd)
-                                
-                                ; If on different monitor, move first then maximize
-                                if (windowMonitor != activeMonitor) {
-                                    WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
-                                    Sleep(30)
-                                }
-                                
-                                WinMaximize(hwnd)
-                            } else {
-                                WinRestore(hwnd)
-                                WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
-                            }
-                            
+                            ; If on different monitor, move first then maximize
                             if (windowMonitor != activeMonitor) {
-                                LogDebug("Moved window from monitor " windowMonitor " to monitor " activeMonitor ": " WinGetTitle(hwnd))
+                                WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                                Sleep(30)
                             }
+                            
+                            WinMaximize(hwnd)
+                        } else {
+                            WinRestore(hwnd)
+                            WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                        }
+                        
+                        ; Activate to restore Z-order
+                        WinActivate(hwnd)
+                        
+                        if (windowMonitor != activeMonitor) {
+                            LogDebug("Moved window from monitor " windowMonitor " to monitor " activeMonitor ": " WinGetTitle(hwnd))
                         }
                     } catch as e {
                         LogDebug("Error restoring window: " hwnd " - " e.Message)
@@ -648,10 +782,11 @@ SwitchWorkspace(targetWorkspace) {
                 }
             }
             
+            ; Restore Z-order by activating windows in reverse order (bottom to top)
             Loop windowOrder.Length {
                 idx := windowOrder.Length - A_Index + 1
                 try {
-                    WinMoveBottom(windowOrder[idx])
+                    WinActivate(windowOrder[idx])
                 } catch {
                 }
             }
@@ -659,13 +794,15 @@ SwitchWorkspace(targetWorkspace) {
             UpdateWorkspaceOverlays()
         }
         
+        SaveWorkspaceState()
+        
     } finally {
         SWITCH_IN_PROGRESS := False
     }
 }
 
 SendWindowToWorkspace(targetWorkspace) {
-    global WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces, SWITCH_IN_PROGRESS
+    global WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces, SWITCH_IN_PROGRESS, WorkspaceNames
     
     if (SWITCH_IN_PROGRESS) {
         return
@@ -676,8 +813,16 @@ SendWindowToWorkspace(targetWorkspace) {
     try {
         UpdateWindowMaps()
         
-        hwnd := WinGetID("A")
-        if (!IsValidWindow(hwnd)) {
+        ; Get active window with error handling
+        hwnd := 0
+        try {
+            hwnd := WinGetID("A")
+        } catch {
+            LogDebug("No active window to send to workspace")
+            return
+        }
+        
+        if (!hwnd || !IsValidWindow(hwnd)) {
             LogDebug("Invalid active window")
             return
         }
@@ -696,6 +841,35 @@ SendWindowToWorkspace(targetWorkspace) {
             }
         }
         
+        ; Check if this is the last window on the current workspace
+        windowsOnCurrentWorkspace := 0
+        if (currentWorkspace > 0) {
+            for winHwnd, wsId in WindowWorkspaces {
+                if (wsId == currentWorkspace && WinExist(winHwnd)) {
+                    windowsOnCurrentWorkspace++
+                }
+            }
+        }
+        
+        ; Check if target workspace is unused (not assigned to any monitor)
+        targetIsUnused := targetMonitor == 0
+        
+        ; If target workspace is unused and unnamed, name it after the program
+        if (targetIsUnused && (!WorkspaceNames.Has(targetWorkspace) || WorkspaceNames[targetWorkspace] == "")) {
+            try {
+                processName := WinGetProcessName(hwnd)
+                programName := StrReplace(processName, ".exe", "")
+                ; Capitalize first letter
+                if (StrLen(programName) > 0) {
+                    programName := StrUpper(SubStr(programName, 1, 1)) . SubStr(programName, 2)
+                }
+                WorkspaceNames[targetWorkspace] := programName
+                LogDebug("SendWindowToWorkspace: Named workspace " targetWorkspace " as '" programName "'")
+            } catch {
+                LogDebug("SendWindowToWorkspace: Failed to get process name for naming")
+            }
+        }
+        
         if (currentWorkspace > 0 && WorkspaceLayouts.Has(currentWorkspace)) {
             WorkspaceLayouts[currentWorkspace].Delete(hwnd)
         }
@@ -706,6 +880,12 @@ SendWindowToWorkspace(targetWorkspace) {
             LogDebug("SendWindowToWorkspace: Moved window '" title "' (hwnd: " hwnd ") to workspace " targetWorkspace)
         } catch {
             LogDebug("SendWindowToWorkspace: Moved window hwnd " hwnd " to workspace " targetWorkspace)
+        }
+        
+        ; If this was the last window on the source workspace, remove its name
+        if (currentWorkspace > 0 && windowsOnCurrentWorkspace <= 1 && WorkspaceNames.Has(currentWorkspace)) {
+            WorkspaceNames.Delete(currentWorkspace)
+            LogDebug("SendWindowToWorkspace: Removed name from workspace " currentWorkspace " (no windows remaining)")
         }
         
         if (!WorkspaceLayouts.Has(targetWorkspace)) {
@@ -746,6 +926,7 @@ SendWindowToWorkspace(targetWorkspace) {
         }
         
         SaveWorkspaceState()
+        UpdateWorkspaceOverlays()
         
     } finally {
         SWITCH_IN_PROGRESS := False
@@ -851,10 +1032,313 @@ TileWindows() {
     }
 }
 
-SaveWorkspaceState() {
-    global CONFIG_DIR, WORKSPACE_STATE_FILE, WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces
+GetUnusedWorkspaces() {
+    global MonitorWorkspaces, MAX_WORKSPACES
     
-    LogDebug("SaveWorkspaceState: Called - WindowWorkspaces has " WindowWorkspaces.Count " windows")
+    unusedWorkspaces := []
+    
+    ; Create a set of used workspaces
+    usedWorkspaces := Map()
+    for monitorIndex, workspaceId in MonitorWorkspaces {
+        if (workspaceId > 0) {
+            usedWorkspaces[workspaceId] := true
+        }
+    }
+    
+    ; Find unused workspaces (1 through MAX_WORKSPACES, excluding 0)
+    Loop MAX_WORKSPACES {
+        if (!usedWorkspaces.Has(A_Index)) {
+            unusedWorkspaces.Push(A_Index)
+        }
+    }
+    
+    return unusedWorkspaces
+}
+
+SwitchToNextUnusedWorkspace() {
+    global MonitorWorkspaces, SHOW_TRAY_NOTIFICATIONS
+    
+    activeMonitor := GetActiveMonitor()
+    currentWorkspace := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 0
+    unusedWorkspaces := GetUnusedWorkspaces()
+    
+    if (unusedWorkspaces.Length == 0) {
+        LogDebug("No unused workspaces available")
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("No unused workspaces", "All workspaces are in use", 1)
+        }
+        return
+    }
+    
+    ; Find the next unused workspace higher than current
+    nextWorkspace := 0
+    for workspace in unusedWorkspaces {
+        if (workspace > currentWorkspace) {
+            nextWorkspace := workspace
+            break
+        }
+    }
+    
+    ; If no higher workspace found, wrap to the lowest unused
+    if (nextWorkspace == 0) {
+        nextWorkspace := unusedWorkspaces[1]
+    }
+    
+    LogDebug("Switching to next unused workspace: " nextWorkspace)
+    if (SHOW_TRAY_NOTIFICATIONS) {
+        TrayTip("Workspace " nextWorkspace, "Switching to unused workspace", 1)
+    }
+    
+    SwitchWorkspace(nextWorkspace)
+}
+
+SwitchToPreviousUnusedWorkspace() {
+    global MonitorWorkspaces, SHOW_TRAY_NOTIFICATIONS
+    
+    activeMonitor := GetActiveMonitor()
+    currentWorkspace := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 0
+    unusedWorkspaces := GetUnusedWorkspaces()
+    
+    if (unusedWorkspaces.Length == 0) {
+        LogDebug("No unused workspaces available")
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("No unused workspaces", "All workspaces are in use", 1)
+        }
+        return
+    }
+    
+    ; Find the previous unused workspace lower than current
+    previousWorkspace := 0
+    ; Iterate in reverse to find the highest workspace lower than current
+    Loop unusedWorkspaces.Length {
+        idx := unusedWorkspaces.Length - A_Index + 1
+        workspace := unusedWorkspaces[idx]
+        if (workspace < currentWorkspace) {
+            previousWorkspace := workspace
+            break
+        }
+    }
+    
+    ; If no lower workspace found, wrap to the highest unused
+    if (previousWorkspace == 0) {
+        previousWorkspace := unusedWorkspaces[unusedWorkspaces.Length]
+    }
+    
+    LogDebug("Switching to previous unused workspace: " previousWorkspace)
+    if (SHOW_TRAY_NOTIFICATIONS) {
+        TrayTip("Workspace " previousWorkspace, "Switching to unused workspace", 1)
+    }
+    
+    SwitchWorkspace(previousWorkspace)
+}
+
+SendWindowToNextUnusedWorkspace() {
+    global WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces, WorkspaceNames, SHOW_TRAY_NOTIFICATIONS
+    
+    ; Get active window
+    hwnd := 0
+    try {
+        hwnd := WinGetID("A")
+    } catch as e {
+        LogDebug("SendWindowToNextUnusedWorkspace: Error getting active window - " e.Message)
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("No active window", "Please focus a window first", 1)
+        }
+        return
+    }
+    
+    if (!hwnd || !IsValidWindow(hwnd)) {
+        LogDebug("SendWindowToNextUnusedWorkspace: No valid active window found")
+        return
+    }
+    
+    currentWorkspace := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
+    unusedWorkspaces := GetUnusedWorkspaces()
+    
+    if (unusedWorkspaces.Length == 0) {
+        LogDebug("No unused workspaces available")
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("No unused workspaces", "All workspaces are in use", 1)
+        }
+        return
+    }
+    
+    ; Find the next unused workspace higher than current
+    nextWorkspace := 0
+    for workspace in unusedWorkspaces {
+        if (workspace > currentWorkspace) {
+            nextWorkspace := workspace
+            break
+        }
+    }
+    
+    ; If no higher workspace found, wrap to the lowest unused
+    if (nextWorkspace == 0) {
+        nextWorkspace := unusedWorkspaces[1]
+    }
+    
+    ; If the workspace is unnamed, name it after the program
+    if (!WorkspaceNames.Has(nextWorkspace) || WorkspaceNames[nextWorkspace] == "") {
+        try {
+            processName := WinGetProcessName(hwnd)
+            programName := StrReplace(processName, ".exe", "")
+            ; Capitalize first letter
+            if (StrLen(programName) > 0) {
+                programName := StrUpper(SubStr(programName, 1, 1)) . SubStr(programName, 2)
+            }
+            WorkspaceNames[nextWorkspace] := programName
+            LogDebug("SendWindowToNextUnusedWorkspace: Named workspace " nextWorkspace " as '" programName "'")
+        } catch {
+            LogDebug("SendWindowToNextUnusedWorkspace: Failed to get process name for naming")
+        }
+    }
+    
+    LogDebug("Sending window to next unused workspace: " nextWorkspace)
+    SendWindowToWorkspace(nextWorkspace)
+    
+    if (SHOW_TRAY_NOTIFICATIONS) {
+        workspaceName := WorkspaceNames.Has(nextWorkspace) ? WorkspaceNames[nextWorkspace] : ""
+        if (workspaceName != "") {
+            TrayTip("Sent to Workspace " nextWorkspace, workspaceName, 1)
+        } else {
+            TrayTip("Sent to Workspace " nextWorkspace, "Window moved to unused workspace", 1)
+        }
+    }
+}
+
+SendWindowToPreviousUnusedWorkspace() {
+    global WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces, WorkspaceNames, SHOW_TRAY_NOTIFICATIONS
+    
+    ; Get active window
+    hwnd := 0
+    try {
+        hwnd := WinGetID("A")
+    } catch as e {
+        LogDebug("SendWindowToPreviousUnusedWorkspace: Error getting active window - " e.Message)
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("No active window", "Please focus a window first", 1)
+        }
+        return
+    }
+    
+    if (!hwnd || !IsValidWindow(hwnd)) {
+        LogDebug("SendWindowToPreviousUnusedWorkspace: No valid active window found")
+        return
+    }
+    
+    currentWorkspace := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
+    unusedWorkspaces := GetUnusedWorkspaces()
+    
+    if (unusedWorkspaces.Length == 0) {
+        LogDebug("No unused workspaces available")
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("No unused workspaces", "All workspaces are in use", 1)
+        }
+        return
+    }
+    
+    ; Find the previous unused workspace lower than current
+    previousWorkspace := 0
+    ; Iterate in reverse to find the highest workspace lower than current
+    Loop unusedWorkspaces.Length {
+        idx := unusedWorkspaces.Length - A_Index + 1
+        workspace := unusedWorkspaces[idx]
+        if (workspace < currentWorkspace) {
+            previousWorkspace := workspace
+            break
+        }
+    }
+    
+    ; If no lower workspace found, wrap to the highest unused
+    if (previousWorkspace == 0) {
+        previousWorkspace := unusedWorkspaces[unusedWorkspaces.Length]
+    }
+    
+    ; If the workspace is unnamed, name it after the program
+    if (!WorkspaceNames.Has(previousWorkspace) || WorkspaceNames[previousWorkspace] == "") {
+        try {
+            processName := WinGetProcessName(hwnd)
+            programName := StrReplace(processName, ".exe", "")
+            ; Capitalize first letter
+            if (StrLen(programName) > 0) {
+                programName := StrUpper(SubStr(programName, 1, 1)) . SubStr(programName, 2)
+            }
+            WorkspaceNames[previousWorkspace] := programName
+            LogDebug("SendWindowToPreviousUnusedWorkspace: Named workspace " previousWorkspace " as '" programName "'")
+        } catch {
+            LogDebug("SendWindowToPreviousUnusedWorkspace: Failed to get process name for naming")
+        }
+    }
+    
+    LogDebug("Sending window to previous unused workspace: " previousWorkspace)
+    SendWindowToWorkspace(previousWorkspace)
+    
+    if (SHOW_TRAY_NOTIFICATIONS) {
+        workspaceName := WorkspaceNames.Has(previousWorkspace) ? WorkspaceNames[previousWorkspace] : ""
+        if (workspaceName != "") {
+            TrayTip("Sent to Workspace " previousWorkspace, workspaceName, 1)
+        } else {
+            TrayTip("Sent to Workspace " previousWorkspace, "Window moved to unused workspace", 1)
+        }
+    }
+}
+
+NameWorkspace() {
+    global MonitorWorkspaces, WorkspaceNames, SHOW_TRAY_NOTIFICATIONS
+    
+    ; Get the active monitor and its current workspace
+    activeMonitor := GetActiveMonitor()
+    currentWorkspace := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 0
+    
+    if (currentWorkspace == 0) {
+        LogDebug("NameWorkspace: No active workspace to name")
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("No active workspace", "Cannot name workspace 0", 1)
+        }
+        return
+    }
+    
+    ; Get current name if exists
+    currentName := WorkspaceNames.Has(currentWorkspace) ? WorkspaceNames[currentWorkspace] : ""
+    
+    ; Show input dialog
+    result := InputBox("Enter a name for workspace " currentWorkspace ":", "Name Workspace " currentWorkspace, "w300 h120", currentName)
+    
+    if (result.Result == "Cancel") {
+        return
+    }
+    
+    newName := Trim(result.Value)
+    
+    if (newName == "") {
+        ; Remove name if empty
+        if (WorkspaceNames.Has(currentWorkspace)) {
+            WorkspaceNames.Delete(currentWorkspace)
+            LogDebug("NameWorkspace: Removed name for workspace " currentWorkspace)
+        }
+    } else {
+        ; Set new name
+        WorkspaceNames[currentWorkspace] := newName
+        LogDebug("NameWorkspace: Set name for workspace " currentWorkspace " to: " newName)
+    }
+    
+    ; Save state and refresh overlays
+    SaveWorkspaceState()
+    UpdateWorkspaceOverlays()
+    
+    if (SHOW_TRAY_NOTIFICATIONS) {
+        if (newName == "") {
+            TrayTip("Workspace " currentWorkspace, "Name removed", 1)
+        } else {
+            TrayTip("Workspace " currentWorkspace, "Named: " newName, 1)
+        }
+    }
+}
+
+SaveWorkspaceState() {
+    global CONFIG_DIR, WORKSPACE_STATE_FILE, WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces, WorkspaceNames
+    
+    LogDebug("SaveWorkspaceState: Called - WindowWorkspaces has " WindowWorkspaces.Count " windows, WindowZOrder has " WindowZOrder.Count " entries")
     
     if (!DirExist(CONFIG_DIR)) {
         DirCreate(CONFIG_DIR)
@@ -864,7 +1348,8 @@ SaveWorkspaceState() {
         version: VERSION,
         timestamp: A_Now,
         monitors: Map(),
-        windows: []
+        windows: [],
+        workspaceNames: Map()
     }
     
     for monitor, workspace in MonitorWorkspaces {
@@ -875,9 +1360,31 @@ SaveWorkspaceState() {
     windowsInZOrder := WinGetList()
     zOrderMap := Map()
     
-    ; Create Z-order index for each window
-    for index, hwnd in windowsInZOrder {
-        zOrderMap[hwnd] := index
+    ; Create Z-order index for each window and update global tracking
+    ; Only track Z-order for managed windows on visible workspaces
+    visibleWorkspaces := Map()
+    for monitor, workspace in MonitorWorkspaces {
+        visibleWorkspaces[workspace] := true
+    }
+    
+    zOrderIndex := 0
+    for hwnd in windowsInZOrder {
+        ; Only track if window is managed AND on a visible workspace
+        if (WindowWorkspaces.Has(hwnd)) {
+            workspace := WindowWorkspaces[hwnd]
+            if (visibleWorkspaces.Has(workspace)) {
+                zOrderIndex++
+                zOrderMap[hwnd] := zOrderIndex
+                ; Update global Z-order tracking
+                WindowZOrder[hwnd] := zOrderIndex
+                try {
+                    title := WinGetTitle(hwnd)
+                    LogDebug("SaveWorkspaceState: Set Z-order for '" title "' (hwnd: " hwnd ", workspace: " workspace ") to " zOrderIndex)
+                } catch {
+                    LogDebug("SaveWorkspaceState: Set Z-order for hwnd " hwnd " (workspace: " workspace ") to " zOrderIndex)
+                }
+            }
+        }
     }
     
     ; Save assigned windows with Z-order
@@ -907,6 +1414,11 @@ SaveWorkspaceState() {
         }
     }
     
+    ; Save workspace names
+    for workspaceId, name in WorkspaceNames {
+        state.workspaceNames[workspaceId] := name
+    }
+    
     try {
         json := Jxon_Dump(state, 2)
         if (FileExist(WORKSPACE_STATE_FILE)) {
@@ -920,7 +1432,7 @@ SaveWorkspaceState() {
 }
 
 LoadWorkspaceState() {
-    global WORKSPACE_STATE_FILE, WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces
+    global WORKSPACE_STATE_FILE, WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces, WorkspaceNames
     
     LogDebug("LoadWorkspaceState: Called")
     
@@ -1084,6 +1596,8 @@ LoadWorkspaceState() {
                     
                     if (isVisible && WinExist(hwnd)) {
                         windowsToReorder.Push({hwnd: hwnd, zOrder: windowData["zOrder"]})
+                        ; Update global Z-order tracking
+                        WindowZOrder[hwnd] := windowData["zOrder"]
                     }
                 }
             }
@@ -1114,14 +1628,6 @@ LoadWorkspaceState() {
                     LogDebug("LoadWorkspaceState: Failed to restore Z-order for window " windowsToReorder[i].hwnd)
                 }
             }
-            
-            ; Activate the topmost window last
-            if (windowsToReorder.Length > 0) {
-                try {
-                    WinActivate(windowsToReorder[1].hwnd)
-                } catch {
-                }
-            }
         }
         
         LogDebug("LoadWorkspaceState: Successfully loaded - WindowWorkspaces has " WindowWorkspaces.Count " windows")
@@ -1147,6 +1653,15 @@ LoadWorkspaceState() {
             }
         }
         LogDebug("LoadWorkspaceState: " hiddenCount " windows on hidden workspaces")
+        
+        ; Load workspace names
+        if (stateData.Has("workspaceNames")) {
+            LogDebug("LoadWorkspaceState: Loading workspace names")
+            for workspaceId, name in stateData["workspaceNames"] {
+                WorkspaceNames[Number(workspaceId)] := name
+                LogDebug("LoadWorkspaceState: Workspace " workspaceId " named: " name)
+            }
+        }
         
         return true
         
@@ -1185,13 +1700,16 @@ Utility Functions:
 • Alt+Shift+T: Tile windows on active monitor
 • Alt+Shift+H: Show this help
 • Alt+Shift+R: Refresh monitor configuration
+• Alt+Shift+N: Name the current workspace
+• Alt+Up/Down: Cycle through unused workspaces
+• Alt+Shift+Up/Down: Send window to next/previous unused workspace
     )"
     
     MsgBox(instructionText, "Cerberus Instructions", "OK")
 }
 
 ShowWorkspaceMap() {
-    global MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts
+    global MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts, WorkspaceNames
     
     UpdateWindowMaps()
     
@@ -1200,7 +1718,11 @@ ShowWorkspaceMap() {
     monitorCount := MonitorGetCount()
     Loop monitorCount {
         workspace := MonitorWorkspaces.Has(A_Index) ? MonitorWorkspaces[A_Index] : "None"
-        mapText .= "Monitor " A_Index " → Workspace " workspace "`n"
+        workspaceName := ""
+        if (workspace != "None" && WorkspaceNames.Has(workspace)) {
+            workspaceName := " (" WorkspaceNames[workspace] ")"
+        }
+        mapText .= "Monitor " A_Index " → Workspace " workspace workspaceName "`n"
     }
     
     mapText .= "`n`nWORKSPACE CONTENTS:`n`n"
@@ -1218,7 +1740,11 @@ ShowWorkspaceMap() {
                 }
                 
                 status := visible ? "VISIBLE" : "HIDDEN"
-                mapText .= "Workspace " A_Index " (" status ", " windowCount " windows):`n"
+                workspaceName := ""
+                if (WorkspaceNames.Has(A_Index)) {
+                    workspaceName := " - " WorkspaceNames[A_Index]
+                }
+                mapText .= "Workspace " A_Index workspaceName " (" status ", " windowCount " windows):`n"
                 
                 for hwnd, _ in WorkspaceLayouts[A_Index] {
                     try {
@@ -1266,7 +1792,7 @@ ShowWorkspaceMap() {
 }
 
 ToggleOverlays() {
-    global BORDER_VISIBLE, WorkspaceOverlays, BorderOverlay, LAST_ACTIVE_MONITOR
+    global BORDER_VISIBLE, WorkspaceOverlays, WorkspaceNameOverlays, BorderOverlay, LAST_ACTIVE_MONITOR
     
     UpdateWindowMaps()
     
@@ -1285,6 +1811,19 @@ ToggleOverlays() {
             }
         }
         WorkspaceOverlays.Clear()
+        
+        for _, overlay in WorkspaceNameOverlays {
+            try {
+                if (overlay.HasOwnProp("border") && overlay.border) {
+                    overlay.border.Destroy()
+                }
+                if (overlay.HasOwnProp("main") && overlay.main) {
+                    overlay.main.Destroy()
+                }
+            } catch {
+            }
+        }
+        WorkspaceNameOverlays.Clear()
         
         for monitor, _ in BorderOverlay {
             DestroyBorderOverlay(monitor)
@@ -1340,7 +1879,7 @@ RefreshMonitors() {
 }
 
 CleanupWindowReferences() {
-    global WindowWorkspaces, WorkspaceLayouts
+    global WindowWorkspaces, WorkspaceLayouts, WindowZOrder
     
     LogDebug("CleanupWindowReferences: Called")
     windowsToRemove := []
@@ -1353,6 +1892,11 @@ CleanupWindowReferences() {
     
     for hwnd in windowsToRemove {
         WindowWorkspaces.Delete(hwnd)
+        
+        ; Clean up Z-order tracking
+        if (WindowZOrder.Has(hwnd)) {
+            WindowZOrder.Delete(hwnd)
+        }
         
         for workspace, layouts in WorkspaceLayouts {
             if (layouts.Has(hwnd)) {
@@ -1369,7 +1913,7 @@ CheckMouseMovement() {
 }
 
 ExitHandler(reason, code) {
-    global SCRIPT_EXITING, WorkspaceOverlays, BorderOverlay
+    global SCRIPT_EXITING, WorkspaceOverlays, WorkspaceNameOverlays, BorderOverlay
     
     SCRIPT_EXITING := True
     
@@ -1377,6 +1921,18 @@ ExitHandler(reason, code) {
     SaveWorkspaceState()
     
     for _, overlay in WorkspaceOverlays {
+        try {
+            if (overlay.HasOwnProp("border") && overlay.border) {
+                overlay.border.Destroy()
+            }
+            if (overlay.HasOwnProp("main") && overlay.main) {
+                overlay.main.Destroy()
+            }
+        } catch {
+        }
+    }
+    
+    for _, overlay in WorkspaceNameOverlays {
         try {
             if (overlay.HasOwnProp("border") && overlay.border) {
                 overlay.border.Destroy()
@@ -1497,6 +2053,12 @@ Initialize() {
 ^+!9::SendWindowToWorkspace(19)
 ^+!0::SendWindowToWorkspace(20)
 
+!Up::SwitchToNextUnusedWorkspace()
+!Down::SwitchToPreviousUnusedWorkspace()
+
+!+Up::SendWindowToNextUnusedWorkspace()
+!+Down::SendWindowToPreviousUnusedWorkspace()
+
 !+o::{
     UpdateWindowMaps()
     ToggleOverlays()
@@ -1528,6 +2090,10 @@ Initialize() {
 !+r::{
     UpdateWindowMaps()
     RefreshMonitors()
+}
+
+!+n::{
+    NameWorkspace()
 }
 
 IsAdmin() {

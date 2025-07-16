@@ -1,13 +1,10 @@
-# Ignore all files
+# Ignore everything
 *
 
-# Except for markdown, AutoHotkey, and icon files
-!*.md
-!*.ahk
-!*.ico
-
-# Don't ignore .gitignore
+# But not these files
 !.gitignore
+!cerberus.ahk
 
-# Ignore specific patterns within directories
+# Always ignore these directories even if they match above patterns
 logs/
+config/

@@ -1105,38 +1105,65 @@ GetUnusedWorkspaces() {
     return unusedWorkspaces
 }
 
+GetEmptyWorkspaces() {
+    global WindowWorkspaces, MAX_WORKSPACES
+    
+    emptyWorkspaces := []
+    
+    ; Count windows in each workspace
+    workspaceWindowCount := Map()
+    for hwnd, workspace in WindowWorkspaces {
+        if (workspace > 0) {
+            if (!workspaceWindowCount.Has(workspace)) {
+                workspaceWindowCount[workspace] := 0
+            }
+            workspaceWindowCount[workspace]++
+        }
+    }
+    
+    ; Find workspaces with no windows (1 through MAX_WORKSPACES, excluding 0)
+    Loop MAX_WORKSPACES {
+        workspaceId := A_Index
+        if (!workspaceWindowCount.Has(workspaceId)) {
+            emptyWorkspaces.Push(workspaceId)
+        }
+    }
+    
+    return emptyWorkspaces
+}
+
 SwitchToNextUnusedWorkspace() {
     global MonitorWorkspaces, SHOW_TRAY_NOTIFICATIONS
     
     activeMonitor := GetActiveMonitor()
     currentWorkspace := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 0
-    unusedWorkspaces := GetUnusedWorkspaces()
+    emptyWorkspaces := GetEmptyWorkspaces()
     
-    if (unusedWorkspaces.Length == 0) {
-        LogDebug("No unused workspaces available")
+    if (emptyWorkspaces.Length == 0) {
+        LogDebug("No empty workspaces available")
         if (SHOW_TRAY_NOTIFICATIONS) {
-            TrayTip("No unused workspaces", "All workspaces are in use", 1)
+            TrayTip("No empty workspaces", "All workspaces have windows", 1)
         }
         return
     }
     
-    ; Find the next unused workspace higher than current
+    ; Find the next empty workspace higher than current
     nextWorkspace := 0
-    for workspace in unusedWorkspaces {
+    for workspace in emptyWorkspaces {
         if (workspace > currentWorkspace) {
             nextWorkspace := workspace
             break
         }
     }
     
-    ; If no higher workspace found, wrap to the lowest unused
+    ; If no higher workspace found, wrap to the lowest empty
     if (nextWorkspace == 0) {
-        nextWorkspace := unusedWorkspaces[1]
+        nextWorkspace := emptyWorkspaces[1]
     }
     
-    LogDebug("Switching to next unused workspace: " nextWorkspace)
+    LogDebug("Switching to next empty workspace: " nextWorkspace)
     if (SHOW_TRAY_NOTIFICATIONS) {
-        TrayTip("Workspace " nextWorkspace, "Switching to unused workspace", 1)
+        TrayTip("Workspace " nextWorkspace, "Switching to empty workspace", 1)
     }
     
     SwitchWorkspace(nextWorkspace)
@@ -1147,36 +1174,36 @@ SwitchToPreviousUnusedWorkspace() {
     
     activeMonitor := GetActiveMonitor()
     currentWorkspace := MonitorWorkspaces.Has(activeMonitor) ? MonitorWorkspaces[activeMonitor] : 0
-    unusedWorkspaces := GetUnusedWorkspaces()
+    emptyWorkspaces := GetEmptyWorkspaces()
     
-    if (unusedWorkspaces.Length == 0) {
-        LogDebug("No unused workspaces available")
+    if (emptyWorkspaces.Length == 0) {
+        LogDebug("No empty workspaces available")
         if (SHOW_TRAY_NOTIFICATIONS) {
-            TrayTip("No unused workspaces", "All workspaces are in use", 1)
+            TrayTip("No empty workspaces", "All workspaces have windows", 1)
         }
         return
     }
     
-    ; Find the previous unused workspace lower than current
+    ; Find the previous empty workspace lower than current
     previousWorkspace := 0
     ; Iterate in reverse to find the highest workspace lower than current
-    Loop unusedWorkspaces.Length {
-        idx := unusedWorkspaces.Length - A_Index + 1
-        workspace := unusedWorkspaces[idx]
+    Loop emptyWorkspaces.Length {
+        idx := emptyWorkspaces.Length - A_Index + 1
+        workspace := emptyWorkspaces[idx]
         if (workspace < currentWorkspace) {
             previousWorkspace := workspace
             break
         }
     }
     
-    ; If no lower workspace found, wrap to the highest unused
+    ; If no lower workspace found, wrap to the highest empty
     if (previousWorkspace == 0) {
-        previousWorkspace := unusedWorkspaces[unusedWorkspaces.Length]
+        previousWorkspace := emptyWorkspaces[emptyWorkspaces.Length]
     }
     
-    LogDebug("Switching to previous unused workspace: " previousWorkspace)
+    LogDebug("Switching to previous empty workspace: " previousWorkspace)
     if (SHOW_TRAY_NOTIFICATIONS) {
-        TrayTip("Workspace " previousWorkspace, "Switching to unused workspace", 1)
+        TrayTip("Workspace " previousWorkspace, "Switching to empty workspace", 1)
     }
     
     SwitchWorkspace(previousWorkspace)
@@ -1203,28 +1230,28 @@ SendWindowToNextUnusedWorkspace() {
     }
     
     currentWorkspace := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
-    unusedWorkspaces := GetUnusedWorkspaces()
+    emptyWorkspaces := GetEmptyWorkspaces()
     
-    if (unusedWorkspaces.Length == 0) {
-        LogDebug("No unused workspaces available")
+    if (emptyWorkspaces.Length == 0) {
+        LogDebug("No empty workspaces available")
         if (SHOW_TRAY_NOTIFICATIONS) {
-            TrayTip("No unused workspaces", "All workspaces are in use", 1)
+            TrayTip("No empty workspaces", "All workspaces have windows", 1)
         }
         return
     }
     
-    ; Find the next unused workspace higher than current
+    ; Find the next empty workspace higher than current
     nextWorkspace := 0
-    for workspace in unusedWorkspaces {
+    for workspace in emptyWorkspaces {
         if (workspace > currentWorkspace) {
             nextWorkspace := workspace
             break
         }
     }
     
-    ; If no higher workspace found, wrap to the lowest unused
+    ; If no higher workspace found, wrap to the lowest empty
     if (nextWorkspace == 0) {
-        nextWorkspace := unusedWorkspaces[1]
+        nextWorkspace := emptyWorkspaces[1]
     }
     
     ; If the workspace is unnamed, name it after the program
@@ -1243,7 +1270,7 @@ SendWindowToNextUnusedWorkspace() {
         }
     }
     
-    LogDebug("Sending window to next unused workspace: " nextWorkspace)
+    LogDebug("Sending window to next empty workspace: " nextWorkspace)
     SendWindowToWorkspace(nextWorkspace)
     
     if (SHOW_TRAY_NOTIFICATIONS) {
@@ -1251,7 +1278,7 @@ SendWindowToNextUnusedWorkspace() {
         if (workspaceName != "") {
             TrayTip("Sent to Workspace " nextWorkspace, workspaceName, 1)
         } else {
-            TrayTip("Sent to Workspace " nextWorkspace, "Window moved to unused workspace", 1)
+            TrayTip("Sent to Workspace " nextWorkspace, "Window moved to empty workspace", 1)
         }
     }
 }
@@ -1277,31 +1304,31 @@ SendWindowToPreviousUnusedWorkspace() {
     }
     
     currentWorkspace := WindowWorkspaces.Has(hwnd) ? WindowWorkspaces[hwnd] : 0
-    unusedWorkspaces := GetUnusedWorkspaces()
+    emptyWorkspaces := GetEmptyWorkspaces()
     
-    if (unusedWorkspaces.Length == 0) {
-        LogDebug("No unused workspaces available")
+    if (emptyWorkspaces.Length == 0) {
+        LogDebug("No empty workspaces available")
         if (SHOW_TRAY_NOTIFICATIONS) {
-            TrayTip("No unused workspaces", "All workspaces are in use", 1)
+            TrayTip("No empty workspaces", "All workspaces have windows", 1)
         }
         return
     }
     
-    ; Find the previous unused workspace lower than current
+    ; Find the previous empty workspace lower than current
     previousWorkspace := 0
     ; Iterate in reverse to find the highest workspace lower than current
-    Loop unusedWorkspaces.Length {
-        idx := unusedWorkspaces.Length - A_Index + 1
-        workspace := unusedWorkspaces[idx]
+    Loop emptyWorkspaces.Length {
+        idx := emptyWorkspaces.Length - A_Index + 1
+        workspace := emptyWorkspaces[idx]
         if (workspace < currentWorkspace) {
             previousWorkspace := workspace
             break
         }
     }
     
-    ; If no lower workspace found, wrap to the highest unused
+    ; If no lower workspace found, wrap to the highest empty
     if (previousWorkspace == 0) {
-        previousWorkspace := unusedWorkspaces[unusedWorkspaces.Length]
+        previousWorkspace := emptyWorkspaces[emptyWorkspaces.Length]
     }
     
     ; If the workspace is unnamed, name it after the program
@@ -1320,7 +1347,7 @@ SendWindowToPreviousUnusedWorkspace() {
         }
     }
     
-    LogDebug("Sending window to previous unused workspace: " previousWorkspace)
+    LogDebug("Sending window to previous empty workspace: " previousWorkspace)
     SendWindowToWorkspace(previousWorkspace)
     
     if (SHOW_TRAY_NOTIFICATIONS) {
@@ -1328,7 +1355,7 @@ SendWindowToPreviousUnusedWorkspace() {
         if (workspaceName != "") {
             TrayTip("Sent to Workspace " previousWorkspace, workspaceName, 1)
         } else {
-            TrayTip("Sent to Workspace " previousWorkspace, "Window moved to unused workspace", 1)
+            TrayTip("Sent to Workspace " previousWorkspace, "Window moved to empty workspace", 1)
         }
     }
 }
@@ -1840,7 +1867,7 @@ ShowWorkspaceMap() {
     mapWindow := Gui("+Resize", "Workspace Map")
     mapWindow.SetFont("s10", "Consolas")
     textCtrl := mapWindow.Add("Edit", "ReadOnly w600 h400", mapText)
-    mapWindow.Add("Button", "w100", "OK").OnEvent("Click", (*) => mapWindow.Close())
+    mapWindow.Add("Button", "w100", "OK").OnEvent("Click", (*) => mapWindow.Destroy())
     mapWindow.Show()
 }
 

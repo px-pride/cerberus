@@ -982,11 +982,51 @@ TileWindows() {
     tileWidth := monitorWidth / cols
     tileHeight := monitorHeight / rows
     
+    ; Calculate empty tiles and give them to first window
+    totalTiles := cols * rows
+    emptyTiles := totalTiles - count
+    firstWindowRows := 1 + emptyTiles
+    
     index := 0
+    ; Handle first window specially if it spans multiple rows
+    if (count > 0 && emptyTiles > 0) {
+        hwnd := windows[1]
+        index := 1
+        
+        x := left
+        y := top
+        w := tileWidth
+        h := tileHeight * firstWindowRows
+        
+        try {
+            WinRestore(hwnd)
+            WinMove(x, y, w, h, hwnd)
+            
+            relPos := AbsoluteToRelativePosition(x, y, w, h, activeMonitor)
+            WorkspaceLayouts[workspace][hwnd] := {
+                xPercent: relPos.xPercent,
+                yPercent: relPos.yPercent,
+                widthPercent: relPos.widthPercent,
+                heightPercent: relPos.heightPercent,
+                monitor: activeMonitor,
+                state: 0
+            }
+        } catch {
+            LogDebug("Error tiling window: " hwnd)
+        }
+    }
+    
+    ; Handle remaining windows
+    remainingIndex := 0
     Loop rows {
         row := A_Index - 1
         Loop cols {
             col := A_Index - 1
+            
+            ; Skip the first column for all rows if first window spans multiple rows
+            if (emptyTiles > 0 && col == 0) {
+                continue
+            }
             
             if (++index > count) {
                 break
@@ -995,15 +1035,25 @@ TileWindows() {
             hwnd := windows[index]
             
             x := left + (col * tileWidth)
-            y := top + (row * tileHeight)
+            y := top + (remainingIndex * tileHeight)
             w := tileWidth
             h := tileHeight
             
+            ; Adjust width for last column
             if (col == cols - 1) {
                 w := monitorWidth - (col * tileWidth)
             }
-            if (row == rows - 1) {
-                h := monitorHeight - (row * tileHeight)
+            
+            ; For remaining windows in the first column after the spanning window
+            if (emptyTiles == 0) {
+                y := top + (row * tileHeight)
+                ; Adjust height for last row
+                if (row == rows - 1) {
+                    h := monitorHeight - (row * tileHeight)
+                }
+            } else {
+                ; When first window spans rows, increment position for other windows
+                remainingIndex++
             }
             
             try {

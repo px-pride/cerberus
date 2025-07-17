@@ -4,6 +4,7 @@
 # But not these files
 !.gitignore
 !cerberus.ahk
+!README.md
 
 # Always ignore these directories even if they match above patterns
 logs/

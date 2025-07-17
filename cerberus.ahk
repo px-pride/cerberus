@@ -63,7 +63,7 @@ LogDebug(msg) {
         return
     }
     
-    timestamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
+    timestamp := FormatTime(, "yyyy-MM-dd HH:mm:ss.000")
     fullMsg := timestamp " - " msg
     
     if (LOG_TO_FILE && LOG_FILE) {
@@ -1520,6 +1520,9 @@ LoadWorkspaceState() {
                 }
             }
         }
+        
+        ; Allow time for all windows to finish minimizing
+        Sleep(100)
         
         LogDebug("LoadWorkspaceState: Checking for monitors property...")
         if (stateData.Has("monitors")) {

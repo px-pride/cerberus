@@ -1,0 +1,12 @@
+# Ignore everything
+*
+
+# But not these files
+!.gitignore
+!cerberus.ahk
+!README.md
+!LICENSE
+
+# Always ignore these directories even if they match above patterns
+logs/
+config/

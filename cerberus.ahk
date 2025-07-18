@@ -1764,12 +1764,14 @@ Workspace Switching (changes workspace on active monitor):
 • Alt+0: Switch to workspace 10
 • Ctrl+Alt+1-9: Switch to workspaces 11-19
 • Ctrl+Alt+0: Switch to workspace 20
+• Alt+Up/Down: Cycle through unused workspaces
 
 Window Sending (moves active window to workspace):
 • Alt+Shift+1-9: Send to workspaces 1-9
 • Alt+Shift+0: Send to workspace 10
 • Ctrl+Shift+Alt+1-9: Send to workspaces 11-19
 • Ctrl+Shift+Alt+0: Send to workspace 20
+• Alt+Shift+Up/Down: Send window to next/previous unused workspace
 
 Utility Functions:
 • Alt+Shift+O: Toggle overlays and borders
@@ -1778,8 +1780,6 @@ Utility Functions:
 • Alt+Shift+H: Show this help
 • Alt+Shift+R: Refresh monitor configuration
 • Alt+Shift+N: Name the current workspace
-• Alt+Up/Down: Cycle through unused workspaces
-• Alt+Shift+Up/Down: Send window to next/previous unused workspace
     )"
     
     MsgBox(instructionText, "Cerberus Instructions", "OK")

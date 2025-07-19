@@ -3,7 +3,7 @@
 
 TraySetIcon("cerberus.ico")
 
-global VERSION := "1.0.0"
+global VERSION := "1.0.2"
 global MAX_WORKSPACES := 20
 
 global DEBUG_MODE := True
@@ -304,7 +304,6 @@ UpdateWindowMaps() {
                             yPercent: relPos.yPercent,
                             widthPercent: relPos.widthPercent,
                             heightPercent: relPos.heightPercent,
-                            monitor: currentMonitor,
                             state: minMax
                         }
                     }
@@ -893,7 +892,6 @@ SendWindowToWorkspace(targetWorkspace) {
                 yPercent: relPos.yPercent,
                 widthPercent: relPos.widthPercent,
                 heightPercent: relPos.heightPercent,
-                monitor: targetMonitor,
                 state: WinGetMinMax(hwnd)
             }
         } else {
@@ -906,7 +904,6 @@ SendWindowToWorkspace(targetWorkspace) {
                 yPercent: relPos.yPercent,
                 widthPercent: relPos.widthPercent,
                 heightPercent: relPos.heightPercent,
-                monitor: currentMonitor,
                 state: WinGetMinMax(hwnd)
             }
             
@@ -996,7 +993,6 @@ TileWindows() {
                 yPercent: relPos.yPercent,
                 widthPercent: relPos.widthPercent,
                 heightPercent: relPos.heightPercent,
-                monitor: activeMonitor,
                 state: 0
             }
         } catch {
@@ -1046,7 +1042,6 @@ TileWindows() {
                     yPercent: relPos.yPercent,
                     widthPercent: relPos.widthPercent,
                     heightPercent: relPos.heightPercent,
-                    monitor: activeMonitor,
                     state: 0
                 }
             } catch {
@@ -1569,18 +1564,17 @@ LoadWorkspaceState() {
                             WindowWorkspaces[hwnd] := windowData["workspace"]
                             LogDebug("LoadWorkspaceState: Matched window " hwnd " '" currentTitle "' to workspace " windowData["workspace"] " (saved as '" windowData["title"] "')")
                             
-                            ; Check if this is a hidden workspace
-                            if (windowData["workspace"] > 0) {
-                                isHiddenWorkspace := true
-                                for monIdx, monWsId in MonitorWorkspaces {
-                                    if (monWsId == windowData["workspace"]) {
-                                        isHiddenWorkspace := false
-                                        break
-                                    }
+                            ; Check if workspace is visible
+                            isVisibleWorkspace := false
+                            for monIdx, monWsId in MonitorWorkspaces {
+                                if (monWsId == windowData["workspace"]) {
+                                    isVisibleWorkspace := true
+                                    LogDebug("LoadWorkspaceState: Window is on VISIBLE workspace " windowData["workspace"] " (monitor " monIdx ")")
+                                    break
                                 }
-                                if (isHiddenWorkspace) {
-                                    LogDebug("LoadWorkspaceState: Window is on HIDDEN workspace " windowData["workspace"])
-                                }
+                            }
+                            if (!isVisibleWorkspace && windowData["workspace"] != 0) {
+                                LogDebug("LoadWorkspaceState: Window is on HIDDEN workspace " windowData["workspace"])
                             }
                             
                             if (windowData.Has("layout")) {
@@ -1588,6 +1582,7 @@ LoadWorkspaceState() {
                                     WorkspaceLayouts[windowData["workspace"]] := Map()
                                 }
                                 WorkspaceLayouts[windowData["workspace"]][hwnd] := windowData["layout"]
+                                LogDebug("LoadWorkspaceState: Stored layout for window '" windowData["title"] "' in workspace " windowData["workspace"])
                             }
                             
                             matchedWindows[hwnd] := true
@@ -1610,26 +1605,62 @@ LoadWorkspaceState() {
             }
         }
         
+        ; Position windows on visible workspaces
+        LogDebug("LoadWorkspaceState: Beginning window positioning for visible workspaces")
         for monIdx, wsId in MonitorWorkspaces {
+            LogDebug("LoadWorkspaceState: Processing monitor " monIdx " with workspace " wsId)
             if (WorkspaceLayouts.Has(wsId)) {
+                LogDebug("LoadWorkspaceState: Found layout data for workspace " wsId " with " WorkspaceLayouts[wsId].Count " windows")
                 for hwnd, layout in WorkspaceLayouts[wsId] {
                     try {
                         if (WinExist(hwnd)) {
+                            title := WinGetTitle(hwnd)
+                            LogDebug("LoadWorkspaceState: Positioning window '" title "' (hwnd: " hwnd ") on monitor " monIdx)
                             absPos := RelativeToAbsolutePosition(layout, monIdx)
                             
                             ; Handle both Map (from JSON) and Object
                             state := (layout is Map) ? layout["state"] : layout.state
                             if (state == 1) {
                                 WinRestore(hwnd)
+                                ; Move to correct monitor before maximizing
+                                WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
                                 WinMaximize(hwnd)
+                                LogDebug("LoadWorkspaceState: Maximized window '" title "' on monitor " monIdx)
                             } else {
                                 WinRestore(hwnd)
                                 WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                                LogDebug("LoadWorkspaceState: Positioned window '" title "' at x:" absPos.x " y:" absPos.y)
                             }
+                        } else {
+                            LogDebug("LoadWorkspaceState: Window hwnd " hwnd " no longer exists")
                         }
                     } catch as e {
                         LogDebug("Error restoring window: " hwnd " - " e.Message)
                     }
+                }
+            } else {
+                LogDebug("LoadWorkspaceState: No layout data for workspace " wsId)
+            }
+        }
+        
+        ; Log windows that couldn't be positioned
+        LogDebug("LoadWorkspaceState: Checking for unpositioned windows")
+        for hwnd, wsId in WindowWorkspaces {
+            ; Check if this window's workspace is visible
+            isVisible := false
+            for monIdx, monWsId in MonitorWorkspaces {
+                if (monWsId == wsId) {
+                    isVisible := true
+                    break
+                }
+            }
+            
+            if (isVisible && (!WorkspaceLayouts.Has(wsId) || !WorkspaceLayouts[wsId].Has(hwnd))) {
+                try {
+                    title := WinGetTitle(hwnd)
+                    LogDebug("LoadWorkspaceState: WARNING - Window '" title "' (hwnd: " hwnd ") on visible workspace " wsId " has no layout data and wasn't positioned")
+                } catch {
+                    LogDebug("LoadWorkspaceState: WARNING - Window hwnd " hwnd " on visible workspace " wsId " has no layout data and wasn't positioned")
                 }
             }
         }

@@ -3,7 +3,7 @@
 
 TraySetIcon("cerberus.ico")
 
-global VERSION := "1.0.2"
+global VERSION := "1.0.3"
 global MAX_WORKSPACES := 20
 
 global DEBUG_MODE := True
@@ -162,6 +162,91 @@ GetMonitorForWindow(hwnd) {
         LogDebug("Error getting monitor for window: " hwnd)
     }
     return 0
+}
+
+; Window placement functions to fix maximize/unmaximize position cache
+GetWindowPlacement(hwnd) {
+    ; WINDOWPLACEMENT structure is 44 bytes
+    wp := Buffer(44, 0)
+    NumPut("UInt", 44, wp, 0)  ; Set structure size
+    
+    if (!DllCall("GetWindowPlacement", "Ptr", hwnd, "Ptr", wp)) {
+        LogDebug("GetWindowPlacement failed for hwnd: " hwnd)
+        return false
+    }
+    
+    ; Return object with placement data
+    return {
+        showCmd: NumGet(wp, 8, "UInt"),
+        minPosX: NumGet(wp, 12, "Int"),
+        minPosY: NumGet(wp, 16, "Int"),
+        maxPosX: NumGet(wp, 20, "Int"),
+        maxPosY: NumGet(wp, 24, "Int"),
+        left: NumGet(wp, 28, "Int"),
+        top: NumGet(wp, 32, "Int"),
+        right: NumGet(wp, 36, "Int"),
+        bottom: NumGet(wp, 40, "Int")
+    }
+}
+
+SetWindowPlacementEx(hwnd, x, y, width, height, showCmd := 0) {
+    ; WINDOWPLACEMENT structure is 44 bytes
+    wp := Buffer(44, 0)
+    NumPut("UInt", 44, wp, 0)  ; Set structure size
+    
+    ; Get current placement to preserve minimize/maximize positions
+    if (!DllCall("GetWindowPlacement", "Ptr", hwnd, "Ptr", wp)) {
+        LogDebug("GetWindowPlacement failed in SetWindowPlacementEx for hwnd: " hwnd)
+        return false
+    }
+    
+    ; Update show command if specified
+    if (showCmd > 0) {
+        NumPut("UInt", showCmd, wp, 8)
+    }
+    
+    ; Update normal position (restored window position)
+    NumPut("Int", x, wp, 28)           ; left
+    NumPut("Int", y, wp, 32)           ; top
+    NumPut("Int", x + width, wp, 36)  ; right
+    NumPut("Int", y + height, wp, 40) ; bottom
+    
+    ; Set the window placement
+    if (!DllCall("SetWindowPlacement", "Ptr", hwnd, "Ptr", wp)) {
+        LogDebug("SetWindowPlacement failed for hwnd: " hwnd)
+        return false
+    }
+    
+    LogDebug("SetWindowPlacement succeeded for hwnd " hwnd " at " x "," y " " width "x" height)
+    return true
+}
+
+; Wrapper function that moves window and updates placement cache
+MoveWindowWithPlacement(hwnd, x, y, width, height) {
+    try {
+        ; Get current window state
+        minMax := WinGetMinMax(hwnd)
+        
+        if (minMax == 1) {
+            ; Window is maximized - restore, move, and re-maximize
+            WinRestore(hwnd)
+            SetWindowPlacementEx(hwnd, x, y, width, height, 9)  ; 9 = SW_RESTORE
+            WinMove(x, y, width, height, hwnd)
+            WinMaximize(hwnd)
+        } else if (minMax == -1) {
+            ; Window is minimized - just update placement
+            SetWindowPlacementEx(hwnd, x, y, width, height)
+        } else {
+            ; Window is normal - update placement and move
+            SetWindowPlacementEx(hwnd, x, y, width, height, 9)  ; 9 = SW_RESTORE
+            WinMove(x, y, width, height, hwnd)
+        }
+        
+        return true
+    } catch as e {
+        LogDebug("MoveWindowWithPlacement error: " e.Message)
+        return false
+    }
 }
 
 AbsoluteToRelativePosition(x, y, w, h, monitorIndex) {
@@ -684,14 +769,14 @@ SwitchWorkspace(targetWorkspace) {
                             
                             ; If on different monitor, move first then maximize
                             if (windowMonitor != activeMonitor) {
-                                WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                                MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
                                 Sleep(30)
                             }
                             
                             WinMaximize(hwnd)
                         } else {
                             WinRestore(hwnd)
-                            WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                            MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
                         }
                         
                         ; Activate to restore Z-order
@@ -733,10 +818,10 @@ SwitchWorkspace(targetWorkspace) {
                             
                             if (layout.state == 1) {
                                 WinRestore(hwnd)
-                                WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                                MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
                                 WinMaximize(hwnd)
                             } else {
-                                WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                                MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
                             }
                             
                             layout.monitor := targetMonitor
@@ -755,10 +840,10 @@ SwitchWorkspace(targetWorkspace) {
                             
                             if (layout.state == 1) {
                                 WinRestore(hwnd)
-                                WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                                MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
                                 WinMaximize(hwnd)
                             } else {
-                                WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                                MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
                             }
                             
                             layout.monitor := activeMonitor
@@ -885,7 +970,7 @@ SendWindowToWorkspace(targetWorkspace) {
             relPos := AbsoluteToRelativePosition(x, y, w, h, currentMonitor)
             
             absPos := RelativeToAbsolutePosition(relPos, targetMonitor)
-            WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+            MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
             
             WorkspaceLayouts[targetWorkspace][hwnd] := {
                 xPercent: relPos.xPercent,
@@ -1623,12 +1708,12 @@ LoadWorkspaceState() {
                             if (state == 1) {
                                 WinRestore(hwnd)
                                 ; Move to correct monitor before maximizing
-                                WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                                MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
                                 WinMaximize(hwnd)
                                 LogDebug("LoadWorkspaceState: Maximized window '" title "' on monitor " monIdx)
                             } else {
                                 WinRestore(hwnd)
-                                WinMove(absPos.x, absPos.y, absPos.width, absPos.height, hwnd)
+                                MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
                                 LogDebug("LoadWorkspaceState: Positioned window '" title "' at x:" absPos.x " y:" absPos.y)
                             }
                         } else {

@@ -227,109 +227,91 @@ UpdateWindowMaps() {
     }
     LogDebug("UpdateWindowMaps: " hiddenWindowCount " windows on hidden workspaces before processing")
     
-    monitorCount := MonitorGetCount()
-    Loop monitorCount {
-        monitorIndex := A_Index
-        
-        if (!MonitorWorkspaces.Has(monitorIndex)) {
+    ; Build a set of visible workspaces for quick lookup
+    visibleWorkspaces := Map()
+    for monIdx, wsId in MonitorWorkspaces {
+        if (wsId > 0) {
+            visibleWorkspaces[wsId] := monIdx
+        }
+    }
+    
+    ; Process all windows
+    windows := WinGetList()
+    for hwnd in windows {
+        if (!IsValidWindow(hwnd)) {
             continue
         }
         
-        activeWorkspace := MonitorWorkspaces[monitorIndex]
-        if (activeWorkspace == 0) {
-            continue
-        }
-        
-        if (WorkspaceLayouts.Has(activeWorkspace)) {
-            windowsToRemove := []
-            for hwnd, layout in WorkspaceLayouts[activeWorkspace] {
-                if (!WinExist(hwnd)) {
-                    windowsToRemove.Push(hwnd)
-                    continue
-                }
-                
-                try {
-                    minMax := WinGetMinMax(hwnd)
-                    if (minMax == -1) {
-                        windowsToRemove.Push(hwnd)
-                        continue
-                    }
-                    
-                    currentMonitor := GetMonitorForWindow(hwnd)
-                    if (currentMonitor != monitorIndex) {
-                        windowsToRemove.Push(hwnd)
-                        continue
-                    }
-                } catch {
-                    windowsToRemove.Push(hwnd)
-                }
-            }
+        try {
+            minMax := WinGetMinMax(hwnd)
             
-            for hwnd in windowsToRemove {
-                WorkspaceLayouts[activeWorkspace].Delete(hwnd)
+            ; If window is minimized
+            if (minMax == -1) {
+                ; If it's assigned to a visible workspace, unassign it
                 if (WindowWorkspaces.Has(hwnd)) {
-                    WindowWorkspaces.Delete(hwnd)
-                }
-            }
-        }
-        
-        windows := WinGetList()
-        for hwnd in windows {
-            if (!IsValidWindow(hwnd)) {
-                continue
-            }
-            
-            currentMonitor := GetMonitorForWindow(hwnd)
-            if (currentMonitor != monitorIndex) {
-                continue
-            }
-            
-            try {
-                minMax := WinGetMinMax(hwnd)
-                if (minMax == -1) {
-                    continue
-                }
-                
-                if (!WindowWorkspaces.Has(hwnd)) {
-                    LogDebug("UpdateWindowMaps: Assigning new window " hwnd " to workspace " activeWorkspace)
-                    WindowWorkspaces[hwnd] := activeWorkspace
-                    
-                    if (!WorkspaceLayouts.Has(activeWorkspace)) {
-                        WorkspaceLayouts[activeWorkspace] := Map()
-                    }
-                    
-                    WinGetPos(&x, &y, &w, &h, hwnd)
-                    relPos := AbsoluteToRelativePosition(x, y, w, h, monitorIndex)
-                    
-                    WorkspaceLayouts[activeWorkspace][hwnd] := {
-                        xPercent: relPos.xPercent,
-                        yPercent: relPos.yPercent,
-                        widthPercent: relPos.widthPercent,
-                        heightPercent: relPos.heightPercent,
-                        monitor: monitorIndex,
-                        state: minMax
-                    }
-                } else if (WindowWorkspaces[hwnd] == activeWorkspace) {
-                    ; Update layout for windows already on this workspace
-                    if (!WorkspaceLayouts.Has(activeWorkspace)) {
-                        WorkspaceLayouts[activeWorkspace] := Map()
-                    }
-                    
-                    WinGetPos(&x, &y, &w, &h, hwnd)
-                    relPos := AbsoluteToRelativePosition(x, y, w, h, monitorIndex)
-                    
-                    WorkspaceLayouts[activeWorkspace][hwnd] := {
-                        xPercent: relPos.xPercent,
-                        yPercent: relPos.yPercent,
-                        widthPercent: relPos.widthPercent,
-                        heightPercent: relPos.heightPercent,
-                        monitor: monitorIndex,
-                        state: minMax
+                    wsId := WindowWorkspaces[hwnd]
+                    if (visibleWorkspaces.Has(wsId)) {
+                        WindowWorkspaces.Delete(hwnd)
+                        if (WorkspaceLayouts.Has(wsId)) {
+                            WorkspaceLayouts[wsId].Delete(hwnd)
+                        }
+                        try {
+                            title := WinGetTitle(hwnd)
+                            LogDebug("UpdateWindowMaps: Unassigned minimized window '" title "' from visible workspace " wsId)
+                        } catch {
+                            LogDebug("UpdateWindowMaps: Unassigned minimized window " hwnd " from visible workspace " wsId)
+                        }
                     }
                 }
-            } catch {
-                LogDebug("Error processing window: " hwnd)
+            } else {
+                ; Window is open - assign it to its current monitor's workspace
+                currentMonitor := GetMonitorForWindow(hwnd)
+                if (currentMonitor > 0 && MonitorWorkspaces.Has(currentMonitor)) {
+                    targetWorkspace := MonitorWorkspaces[currentMonitor]
+                    if (targetWorkspace > 0) {
+                        ; Check if reassignment is needed
+                        needsReassignment := !WindowWorkspaces.Has(hwnd) || WindowWorkspaces[hwnd] != targetWorkspace
+                        
+                        if (needsReassignment) {
+                            ; Remove from old workspace if exists
+                            if (WindowWorkspaces.Has(hwnd)) {
+                                oldWorkspace := WindowWorkspaces[hwnd]
+                                if (WorkspaceLayouts.Has(oldWorkspace)) {
+                                    WorkspaceLayouts[oldWorkspace].Delete(hwnd)
+                                }
+                            }
+                            
+                            ; Assign to new workspace
+                            WindowWorkspaces[hwnd] := targetWorkspace
+                            try {
+                                title := WinGetTitle(hwnd)
+                                LogDebug("UpdateWindowMaps: Assigned window '" title "' to workspace " targetWorkspace)
+                            } catch {
+                                LogDebug("UpdateWindowMaps: Assigned window " hwnd " to workspace " targetWorkspace)
+                            }
+                        }
+                        
+                        ; Update layout information
+                        if (!WorkspaceLayouts.Has(targetWorkspace)) {
+                            WorkspaceLayouts[targetWorkspace] := Map()
+                        }
+                        
+                        WinGetPos(&x, &y, &w, &h, hwnd)
+                        relPos := AbsoluteToRelativePosition(x, y, w, h, currentMonitor)
+                        
+                        WorkspaceLayouts[targetWorkspace][hwnd] := {
+                            xPercent: relPos.xPercent,
+                            yPercent: relPos.yPercent,
+                            widthPercent: relPos.widthPercent,
+                            heightPercent: relPos.heightPercent,
+                            monitor: currentMonitor,
+                            state: minMax
+                        }
+                    }
+                }
             }
+        } catch {
+            LogDebug("Error processing window: " hwnd)
         }
     }
     

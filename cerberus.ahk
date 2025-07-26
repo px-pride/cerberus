@@ -5,6 +5,8 @@ TraySetIcon("cerberus.ico")
 
 global VERSION := "1.0.3"
 global MAX_WORKSPACES := 20
+global TASK_NAME := "CerberusWM"
+global LAST_STATE_SAVE_TIME := 0
 
 global DEBUG_MODE := True
 global LOG_TO_FILE := True
@@ -1473,9 +1475,12 @@ NameWorkspace() {
 }
 
 SaveWorkspaceState() {
-    global CONFIG_DIR, WORKSPACE_STATE_FILE, WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces, WorkspaceNames
+    global CONFIG_DIR, WORKSPACE_STATE_FILE, WindowWorkspaces, WorkspaceLayouts, MonitorWorkspaces, WorkspaceNames, LAST_STATE_SAVE_TIME
     
     LogDebug("SaveWorkspaceState: Called - WindowWorkspaces has " WindowWorkspaces.Count " windows, WindowZOrder has " WindowZOrder.Count " entries")
+    
+    ; Update last save time
+    LAST_STATE_SAVE_TIME := A_TickCount
     
     if (!DirExist(CONFIG_DIR)) {
         DirCreate(CONFIG_DIR)
@@ -1532,7 +1537,16 @@ SaveWorkspaceState() {
                 workspace: workspace,
                 title: WinGetTitle(hwnd),
                 class: WinGetClass(hwnd),
-                process: WinGetProcessName(hwnd)
+                process: WinGetProcessName(hwnd),
+                exePath: ""
+            }
+            
+            ; Try to get the executable path
+            try {
+                pid := WinGetPID(hwnd)
+                windowData.exePath := ProcessGetPath(pid)
+            } catch {
+                LogDebug("Could not get executable path for window: " hwnd)
             }
             
             ; Add Z-order if available
@@ -2087,13 +2101,69 @@ CheckMouseMovement() {
     UpdateActiveMonitorBorder()
 }
 
+IsSystemShuttingDown() {
+    ; Check Windows Event Log for recent shutdown events
+    ; Event ID 1074 = System shutdown/restart initiated
+    ; Event ID 6006 = Event log service stopping (clean shutdown)
+    ; Event ID 6008 = Unexpected shutdown (we don't care about this)
+    
+    try {
+        ; Check for shutdown events in the last 60 seconds
+        cmd := 'powershell.exe -NoProfile -Command "'
+        cmd .= '$shutdownTime = (Get-Date).AddSeconds(-60); '
+        cmd .= '$events = Get-WinEvent -FilterHashtable @{LogName=\"System\"; ID=1074,6006; StartTime=$shutdownTime} -ErrorAction SilentlyContinue; '
+        cmd .= 'if ($events) { \"SHUTDOWN_DETECTED\" } else { \"NO_SHUTDOWN\" }'
+        cmd .= '"'
+        
+        ; Run PowerShell and capture output
+        tempFile := A_Temp . "\cerberus_shutdown_check.txt"
+        RunWait(cmd . " > `"" . tempFile . "`"",, "Hide")
+        
+        ; Read the output
+        output := ""
+        if (FileExist(tempFile)) {
+            output := Trim(FileRead(tempFile))
+            try {
+                FileDelete(tempFile)
+            } catch {
+            }
+        }
+        
+        LogDebug("IsSystemShuttingDown: PowerShell output = " . output)
+        
+        return (output == "SHUTDOWN_DETECTED")
+        
+    } catch as e {
+        LogDebug("IsSystemShuttingDown: Error checking shutdown status - " . e.Message)
+        ; If we can't determine, assume no shutdown to preserve data
+        return false
+    }
+}
+
 ExitHandler(reason, code) {
     global SCRIPT_EXITING, WorkspaceOverlays, WorkspaceNameOverlays, BorderOverlay
     
     SCRIPT_EXITING := True
     
-    UpdateWindowMaps()
-    SaveWorkspaceState()
+    ; Check if system is shutting down
+    isShutdown := IsSystemShuttingDown()
+    
+    ; Additional check: if we saved state very recently (within 2 seconds), 
+    ; and we're exiting, it might be a shutdown scenario
+    timeSinceLastSave := A_TickCount - LAST_STATE_SAVE_TIME
+    if (!isShutdown && timeSinceLastSave < 2000) {
+        LogDebug("ExitHandler: State was saved " . timeSinceLastSave . "ms ago - possible rapid shutdown")
+        ; Do an additional shutdown check with a shorter timeframe
+        isShutdown := IsSystemShuttingDown()
+    }
+    
+    if (isShutdown) {
+        LogDebug("ExitHandler: System shutdown detected - skipping workspace state save")
+    } else {
+        LogDebug("ExitHandler: Normal exit - saving workspace state")
+        UpdateWindowMaps()
+        SaveWorkspaceState()
+    }
     
     for _, overlay in WorkspaceOverlays {
         try {
@@ -2126,6 +2196,190 @@ ExitHandler(reason, code) {
     LogDebug("Cerberus exiting: " reason)
 }
 
+IsStartupEnabled() {
+    global TASK_NAME
+    
+    try {
+        ; Check if the task exists using schtasks
+        cmd := 'schtasks.exe /Query /TN "' . TASK_NAME . '" /FO LIST'
+        result := RunWait(cmd,, "Hide")
+        
+        ; If result is 0, the task exists
+        return (result == 0)
+    } catch {
+        LogDebug("IsStartupEnabled: Error checking task status")
+    }
+    
+    return false
+}
+
+EnableStartup() {
+    global TASK_NAME, SHOW_TRAY_NOTIFICATIONS
+    
+    exePath := A_ScriptFullPath
+    
+    ; Create the scheduled task XML
+    taskXml := '<?xml version="1.0" encoding="UTF-16"?>'
+    taskXml .= '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
+    taskXml .= '  <RegistrationInfo>'
+    taskXml .= '    <Description>Cerberus Window Manager - Multi-monitor workspace manager</Description>'
+    taskXml .= '  </RegistrationInfo>'
+    taskXml .= '  <Triggers>'
+    taskXml .= '    <LogonTrigger>'
+    taskXml .= '      <Enabled>true</Enabled>'
+    taskXml .= '    </LogonTrigger>'
+    taskXml .= '  </Triggers>'
+    taskXml .= '  <Principals>'
+    taskXml .= '    <Principal id="Author">'
+    taskXml .= '      <UserId>' . A_UserName . '</UserId>'
+    taskXml .= '      <LogonType>InteractiveToken</LogonType>'
+    taskXml .= '      <RunLevel>HighestAvailable</RunLevel>'
+    taskXml .= '    </Principal>'
+    taskXml .= '  </Principals>'
+    taskXml .= '  <Settings>'
+    taskXml .= '    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>'
+    taskXml .= '    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>'
+    taskXml .= '    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>'
+    taskXml .= '    <AllowHardTerminate>false</AllowHardTerminate>'
+    taskXml .= '    <StartWhenAvailable>true</StartWhenAvailable>'
+    taskXml .= '    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>'
+    taskXml .= '    <IdleSettings>'
+    taskXml .= '      <StopOnIdleEnd>false</StopOnIdleEnd>'
+    taskXml .= '      <RestartOnIdle>false</RestartOnIdle>'
+    taskXml .= '    </IdleSettings>'
+    taskXml .= '    <AllowStartOnDemand>true</AllowStartOnDemand>'
+    taskXml .= '    <Enabled>true</Enabled>'
+    taskXml .= '    <Hidden>false</Hidden>'
+    taskXml .= '    <RunOnlyIfIdle>false</RunOnlyIfIdle>'
+    taskXml .= '    <WakeToRun>false</WakeToRun>'
+    taskXml .= '    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>'
+    taskXml .= '    <Priority>7</Priority>'
+    taskXml .= '  </Settings>'
+    taskXml .= '  <Actions Context="Author">'
+    taskXml .= '    <Exec>'
+    taskXml .= '      <Command>' . exePath . '</Command>'
+    taskXml .= '      <Arguments>/startup</Arguments>'
+    taskXml .= '      <WorkingDirectory>' . A_ScriptDir . '</WorkingDirectory>'
+    taskXml .= '    </Exec>'
+    taskXml .= '  </Actions>'
+    taskXml .= '</Task>'
+    
+    ; Save XML to temp file
+    tempFile := A_Temp . "\cerberus_task.xml"
+    try {
+        FileDelete(tempFile)
+    } catch {
+    }
+    FileAppend(taskXml, tempFile, "UTF-16")
+    
+    ; Create the scheduled task
+    cmd := 'schtasks.exe /Create /TN "' . TASK_NAME . '" /XML "' . tempFile . '" /F'
+    result := RunWait(cmd,, "Hide")
+    
+    ; Clean up temp file
+    try {
+        FileDelete(tempFile)
+    } catch {
+    }
+    
+    if (result == 0) {
+        LogDebug("EnableStartup: Task created successfully")
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("Startup enabled", "Cerberus will start with Windows", 1)
+        }
+        return true
+    } else {
+        LogDebug("EnableStartup: Failed to create task, error code: " . result)
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("Failed to enable startup", "Please run Cerberus as administrator", 2)
+        }
+        return false
+    }
+}
+
+DisableStartup() {
+    global TASK_NAME, SHOW_TRAY_NOTIFICATIONS
+    
+    cmd := 'schtasks.exe /Delete /TN "' . TASK_NAME . '" /F'
+    result := RunWait(cmd,, "Hide")
+    
+    if (result == 0) {
+        LogDebug("DisableStartup: Task deleted successfully")
+        if (SHOW_TRAY_NOTIFICATIONS) {
+            TrayTip("Startup disabled", "Cerberus will not start with Windows", 1)
+        }
+        return true
+    } else {
+        LogDebug("DisableStartup: Failed to delete task, error code: " . result)
+        return false
+    }
+}
+
+ToggleStartup(*) {
+    if (IsStartupEnabled()) {
+        DisableStartup()
+    } else {
+        EnableStartup()
+    }
+    
+    ; Refresh the menu to update the checkmark
+    CreateTrayMenu()
+}
+
+IsStartedByTaskScheduler() {
+    ; Check if we were started with the /startup argument
+    for i, arg in A_Args {
+        if (arg == "/startup") {
+            return true
+        }
+    }
+    return false
+}
+
+CreateTrayMenu() {
+    trayMenu := A_TrayMenu
+    trayMenu.Delete()  ; Clear default menu items
+    
+    ; Add custom menu items
+    trayMenu.Add("&Show Instructions", ShowInstructionsMenu)
+    trayMenu.Add("Show &Workspace Map", ShowWorkspaceMapMenu)
+    trayMenu.Add()  ; Separator
+    
+    ; Add startup toggle
+    trayMenu.Add("Start with &Windows", ToggleStartup)
+    if (IsStartupEnabled()) {
+        trayMenu.Check("Start with &Windows")
+    }
+    
+    trayMenu.Add()  ; Separator
+    trayMenu.Add("&Refresh Monitors", RefreshMonitorsMenu)
+    trayMenu.Add()  ; Separator
+    trayMenu.Add("E&xit", ExitApp)
+    
+    ; Set default action (double-click tray icon)
+    trayMenu.Default := "&Show Instructions"
+}
+
+ShowInstructionsMenu(*) {
+    UpdateWindowMaps()
+    ShowInstructions()
+}
+
+ShowWorkspaceMapMenu(*) {
+    UpdateWindowMaps()
+    ShowWorkspaceMap()
+}
+
+RefreshMonitorsMenu(*) {
+    UpdateWindowMaps()
+    RefreshMonitors()
+}
+
+ExitApp(*) {
+    ExitHandler("User requested exit", 0)
+    ExitApp()
+}
+
 Initialize() {
     global MonitorWorkspaces, WindowWorkspaces, SHOW_TRAY_NOTIFICATIONS
     
@@ -2140,6 +2394,9 @@ Initialize() {
     }
     
     OnExit(ExitHandler)
+    
+    ; Create tray menu
+    CreateTrayMenu()
     
     LogDebug("Initialize: Calling RefreshMonitors")
     RefreshMonitors()
@@ -2182,6 +2439,97 @@ Initialize() {
     
     LogDebug("Cerberus initialized successfully")
     LogDebug("Running cerberus4.ahk version " VERSION)
+    
+    ; If started by Task Scheduler, launch programs from workspace state
+    if (IsStartedByTaskScheduler()) {
+        LogDebug("Started by Task Scheduler - will launch programs")
+        SetTimer(() => LaunchProgramsFromWorkspaceState(), -3000)  ; Delay 3 seconds to ensure system is ready
+    }
+}
+
+LaunchProgramsFromWorkspaceState() {
+    global WORKSPACE_STATE_FILE, SHOW_TRAY_NOTIFICATIONS
+    
+    LogDebug("LaunchProgramsFromWorkspaceState: Starting program launch")
+    
+    if (!FileExist(WORKSPACE_STATE_FILE)) {
+        LogDebug("LaunchProgramsFromWorkspaceState: No workspace state file found")
+        return
+    }
+    
+    try {
+        json := FileRead(WORKSPACE_STATE_FILE)
+        state := Jxon_Load(&json)
+        
+        if (!state.HasProp("windows")) {
+            LogDebug("LaunchProgramsFromWorkspaceState: No windows in state")
+            return
+        }
+        
+        ; Create a map to track unique executables to launch
+        programsToLaunch := Map()
+        launchOrder := []
+        
+        ; Group windows by executable path and track launch order
+        for window in state.windows {
+            if (window.HasProp("exePath") && window.exePath != "") {
+                ; Skip system processes and certain applications
+                skipList := ["explorer.exe", "dwm.exe", "taskmgr.exe", "SystemSettings.exe"]
+                processName := window.process
+                
+                shouldSkip := false
+                for skipProc in skipList {
+                    if (StrLower(processName) == StrLower(skipProc)) {
+                        shouldSkip := true
+                        break
+                    }
+                }
+                
+                if (!shouldSkip && FileExist(window.exePath)) {
+                    if (!programsToLaunch.Has(window.exePath)) {
+                        programsToLaunch[window.exePath] := {
+                            path: window.exePath,
+                            workspace: window.workspace,
+                            title: window.title,
+                            process: window.process
+                        }
+                        launchOrder.Push(window.exePath)
+                        LogDebug("LaunchProgramsFromWorkspaceState: Will launch " window.exePath . " for workspace " window.workspace)
+                    }
+                }
+            }
+        }
+        
+        launchedCount := 0
+        
+        ; Launch programs in order
+        for exePath in launchOrder {
+            programInfo := programsToLaunch[exePath]
+            
+            try {
+                Run(programInfo.path)
+                launchedCount++
+                LogDebug("LaunchProgramsFromWorkspaceState: Launched " programInfo.path)
+                
+                ; Small delay between launches to avoid overwhelming the system
+                Sleep(1000)
+            } catch as e {
+                LogDebug("LaunchProgramsFromWorkspaceState: Failed to launch " programInfo.path . ": " e.Message)
+            }
+        }
+        
+        if (SHOW_TRAY_NOTIFICATIONS && launchedCount > 0) {
+            TrayTip("Launched " launchedCount " programs", "Cerberus restored your workspace", 1)
+        }
+        
+        ; After launching, give programs time to start then update window mappings
+        if (launchedCount > 0) {
+            SetTimer(() => UpdateWindowMaps(), -5000)
+        }
+        
+    } catch as e {
+        LogDebug("LaunchProgramsFromWorkspaceState: Error - " e.Message)
+    }
 }
 
 !1::SwitchWorkspace(1)

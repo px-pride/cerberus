@@ -19,6 +19,20 @@ global CONFIG_DIR := A_ScriptDir "\config"
 global WORKSPACE_STATE_FILE := CONFIG_DIR "\workspace_state.json"
 
 global OVERLAY_SIZE := 60
+
+; Store app launcher mappings
+global STORE_APP_LAUNCHERS := Map(
+    "WindowsTerminal.exe", "wt.exe",
+    "Calculator.exe", "calc.exe",
+    "Photos.exe", "ms-photos:",
+    "Mail.exe", "outlookmail:",
+    "Calendar.exe", "outlookcal:",
+    "Microsoft.Msn.Weather.exe", "ms-weather:",
+    "Spotify.exe", "spotify:",
+    "WhatsApp.exe", "whatsapp:",
+    "Slack.exe", "slack:",
+    "MicrosoftEdge.exe", "msedge.exe"
+)
 global OVERLAY_MARGIN := 20
 global OVERLAY_TIMEOUT := 0
 global OVERLAY_OPACITY := 220
@@ -1479,6 +1493,12 @@ SaveWorkspaceState() {
     
     LogDebug("SaveWorkspaceState: Called - WindowWorkspaces has " WindowWorkspaces.Count " windows, WindowZOrder has " WindowZOrder.Count " entries")
     
+    ; Don't save empty state during startup to avoid overwriting good state
+    if (WindowWorkspaces.Count == 0 && IsStartedByTaskScheduler()) {
+        LogDebug("SaveWorkspaceState: Skipping save - no windows and started by Task Scheduler")
+        return
+    }
+    
     ; Update last save time
     LAST_STATE_SAVE_TIME := A_TickCount
     
@@ -2354,7 +2374,7 @@ CreateTrayMenu() {
     trayMenu.Add()  ; Separator
     trayMenu.Add("&Refresh Monitors", RefreshMonitorsMenu)
     trayMenu.Add()  ; Separator
-    trayMenu.Add("E&xit", ExitApp)
+    trayMenu.Add("E&xit", DoExitApp)
     
     ; Set default action (double-click tray icon)
     trayMenu.Default := "&Show Instructions"
@@ -2375,9 +2395,9 @@ RefreshMonitorsMenu(*) {
     RefreshMonitors()
 }
 
-ExitApp(*) {
+DoExitApp(*) {
     ExitHandler("User requested exit", 0)
-    ExitApp()
+    ExitApp()  ; This calls the built-in ExitApp command
 }
 
 Initialize() {
@@ -2408,21 +2428,28 @@ Initialize() {
     
     LogDebug("Initialize: MonitorWorkspaces after RefreshMonitors: " MonitorWorkspaces.Count " monitors")
     
-    if (!LoadWorkspaceState()) {
-        windows := WinGetList()
-        for hwnd in windows {
-            if (IsValidWindow(hwnd)) {
-                try {
-                    minMax := WinGetMinMax(hwnd)
-                    if (minMax == -1) {
-                        WindowWorkspaces[hwnd] := 0
+    if (IsStartedByTaskScheduler()) {
+        ; For Task Scheduler startup, handle everything in LaunchProgramsFromWorkspaceState
+        LogDebug("Initialize: Started by Task Scheduler - launching programs and restoring state")
+        LaunchProgramsFromWorkspaceState()
+    } else {
+        ; Normal startup - just load existing windows
+        if (!LoadWorkspaceState()) {
+            windows := WinGetList()
+            for hwnd in windows {
+                if (IsValidWindow(hwnd)) {
+                    try {
+                        minMax := WinGetMinMax(hwnd)
+                        if (minMax == -1) {
+                            WindowWorkspaces[hwnd] := 0
+                        }
+                    } catch {
                     }
-                } catch {
                 }
             }
+            
+            UpdateWindowMaps()
         }
-        
-        UpdateWindowMaps()
     }
     
     UpdateWorkspaceOverlays()
@@ -2431,7 +2458,10 @@ Initialize() {
     SetTimer(CleanupWindowReferences, 120000)
     SetTimer(CheckMouseMovement, 100)
     
-    ShowInstructions()
+    ; Only show instructions for manual startup
+    if (!IsStartedByTaskScheduler()) {
+        ShowInstructions()
+    }
     
     if (SHOW_TRAY_NOTIFICATIONS) {
         TrayTip("Cerberus initialized", "Multi-monitor workspace manager ready", 1)
@@ -2439,18 +2469,12 @@ Initialize() {
     
     LogDebug("Cerberus initialized successfully")
     LogDebug("Running cerberus4.ahk version " VERSION)
-    
-    ; If started by Task Scheduler, launch programs from workspace state
-    if (IsStartedByTaskScheduler()) {
-        LogDebug("Started by Task Scheduler - will launch programs")
-        SetTimer(() => LaunchProgramsFromWorkspaceState(), -3000)  ; Delay 3 seconds to ensure system is ready
-    }
 }
 
 LaunchProgramsFromWorkspaceState() {
-    global WORKSPACE_STATE_FILE, SHOW_TRAY_NOTIFICATIONS
+    global WORKSPACE_STATE_FILE, SHOW_TRAY_NOTIFICATIONS, MonitorWorkspaces, WindowWorkspaces, WorkspaceLayouts, WorkspaceNames
     
-    LogDebug("LaunchProgramsFromWorkspaceState: Starting program launch")
+    LogDebug("LaunchProgramsFromWorkspaceState: Starting program launch and state restoration")
     
     if (!FileExist(WORKSPACE_STATE_FILE)) {
         LogDebug("LaunchProgramsFromWorkspaceState: No workspace state file found")
@@ -2459,23 +2483,46 @@ LaunchProgramsFromWorkspaceState() {
     
     try {
         json := FileRead(WORKSPACE_STATE_FILE)
-        state := Jxon_Load(&json)
+        LogDebug("LaunchProgramsFromWorkspaceState: Read state file, length: " StrLen(json))
         
-        if (!state.HasProp("windows")) {
-            LogDebug("LaunchProgramsFromWorkspaceState: No windows in state")
+        state := Jxon_Load(&json)
+        LogDebug("LaunchProgramsFromWorkspaceState: Parsed JSON successfully")
+        
+        ; First, restore monitor workspace assignments
+        if (state.Has("monitors")) {
+            LogDebug("LaunchProgramsFromWorkspaceState: Restoring monitor workspace assignments")
+            for monIdx, wsId in state["monitors"] {
+                MonitorWorkspaces[Number(monIdx)] := wsId
+                LogDebug("LaunchProgramsFromWorkspaceState: Monitor " monIdx " -> Workspace " wsId)
+            }
+        }
+        
+        ; Load workspace names
+        if (state.Has("workspaceNames")) {
+            LogDebug("LaunchProgramsFromWorkspaceState: Loading workspace names")
+            for workspaceId, name in state["workspaceNames"] {
+                WorkspaceNames[Number(workspaceId)] := name
+            }
+        }
+        
+        if (!state.Has("windows")) {
+            LogDebug("LaunchProgramsFromWorkspaceState: No windows property in state")
             return
         }
         
+        LogDebug("LaunchProgramsFromWorkspaceState: Found " state["windows"].Length " windows in state")
+        
         ; Create a map to track unique executables to launch
         programsToLaunch := Map()
+        windowInfoByExe := Map()  ; Track all windows for each exe
         launchOrder := []
         
-        ; Group windows by executable path and track launch order
-        for window in state.windows {
-            if (window.HasProp("exePath") && window.exePath != "") {
+        ; Group windows by executable path
+        for window in state["windows"] {
+            if (window.Has("exePath") && window["exePath"] != "") {
                 ; Skip system processes and certain applications
                 skipList := ["explorer.exe", "dwm.exe", "taskmgr.exe", "SystemSettings.exe"]
-                processName := window.process
+                processName := window["process"]
                 
                 shouldSkip := false
                 for skipProc in skipList {
@@ -2485,50 +2532,228 @@ LaunchProgramsFromWorkspaceState() {
                     }
                 }
                 
-                if (!shouldSkip && FileExist(window.exePath)) {
-                    if (!programsToLaunch.Has(window.exePath)) {
-                        programsToLaunch[window.exePath] := {
-                            path: window.exePath,
-                            workspace: window.workspace,
-                            title: window.title,
-                            process: window.process
+                if (!shouldSkip && FileExist(window["exePath"])) {
+                    exePath := window["exePath"]
+                    if (!programsToLaunch.Has(exePath)) {
+                        programsToLaunch[exePath] := {
+                            path: exePath,
+                            process: window["process"]
                         }
-                        launchOrder.Push(window.exePath)
-                        LogDebug("LaunchProgramsFromWorkspaceState: Will launch " window.exePath . " for workspace " window.workspace)
+                        windowInfoByExe[exePath] := []
+                        launchOrder.Push(exePath)
                     }
+                    windowInfoByExe[exePath].Push(window)
+                    LogDebug("LaunchProgramsFromWorkspaceState: Will launch " exePath . " for window '" . window["title"] . "' on workspace " . window["workspace"])
                 }
             }
         }
         
         launchedCount := 0
+        failedLaunches := []
         
-        ; Launch programs in order
+        ; Launch programs and assign windows
         for exePath in launchOrder {
             programInfo := programsToLaunch[exePath]
+            windowInfos := windowInfoByExe[exePath]
             
             try {
-                Run(programInfo.path)
-                launchedCount++
-                LogDebug("LaunchProgramsFromWorkspaceState: Launched " programInfo.path)
+                ; Check if this is a Store app that needs special launcher
+                launchPath := exePath
+                if (InStr(exePath, "\WindowsApps\") && STORE_APP_LAUNCHERS.Has(programInfo.process)) {
+                    launchPath := STORE_APP_LAUNCHERS[programInfo.process]
+                    LogDebug("LaunchProgramsFromWorkspaceState: Using Store app launcher '" . launchPath . "' for " . programInfo.process)
+                }
                 
-                ; Small delay between launches to avoid overwhelming the system
-                Sleep(1000)
+                LogDebug("LaunchProgramsFromWorkspaceState: Launching " launchPath)
+                Run(launchPath)
+                launchedCount++
+                
+                ; Wait for the program to create windows
+                Sleep(2000)
+                
+                ; Find and assign windows created by this program
+                windows := WinGetList()
+                for hwnd in windows {
+                    try {
+                        if (WinGetProcessName(hwnd) == programInfo.process) {
+                            currentTitle := WinGetTitle(hwnd)
+                            currentClass := WinGetClass(hwnd)
+                            
+                            ; Try to match this window with saved window info
+                            for windowInfo in windowInfos {
+                                if (currentClass == windowInfo["class"]) {
+                                    ; Assign to workspace
+                                    workspace := windowInfo["workspace"]
+                                    WindowWorkspaces[hwnd] := workspace
+                                    LogDebug("LaunchProgramsFromWorkspaceState: Assigned window '" . currentTitle . "' (hwnd: " . hwnd . ") to workspace " . workspace)
+                                    
+                                    ; Store layout if available
+                                    if (windowInfo.Has("layout")) {
+                                        if (!WorkspaceLayouts.Has(workspace)) {
+                                            WorkspaceLayouts[workspace] := Map()
+                                        }
+                                        WorkspaceLayouts[workspace][hwnd] := windowInfo["layout"]
+                                        LogDebug("LaunchProgramsFromWorkspaceState: Stored layout for window")
+                                    }
+                                    
+                                    ; Position window if it's on a visible workspace
+                                    isVisibleWorkspace := false
+                                    visibleMonitor := 0
+                                    for monIdx, wsId in MonitorWorkspaces {
+                                        if (wsId == workspace) {
+                                            isVisibleWorkspace := true
+                                            visibleMonitor := monIdx
+                                            break
+                                        }
+                                    }
+                                    
+                                    if (isVisibleWorkspace && windowInfo.Has("layout")) {
+                                        absPos := RelativeToAbsolutePosition(windowInfo["layout"], visibleMonitor)
+                                        if (windowInfo["layout"]["state"] == 1) {
+                                            WinRestore(hwnd)
+                                            MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
+                                            WinMaximize(hwnd)
+                                            LogDebug("LaunchProgramsFromWorkspaceState: Maximized window on monitor " . visibleMonitor)
+                                        } else {
+                                            WinRestore(hwnd)
+                                            MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
+                                            LogDebug("LaunchProgramsFromWorkspaceState: Positioned window at x:" . absPos.x . " y:" . absPos.y)
+                                        }
+                                    } else if (!isVisibleWorkspace) {
+                                        ; Hide windows on hidden workspaces
+                                        WinMinimize(hwnd)
+                                        LogDebug("LaunchProgramsFromWorkspaceState: Minimized window on hidden workspace " . workspace)
+                                    }
+                                    
+                                    break  ; Found a match, move to next window
+                                }
+                            }
+                        }
+                    } catch as e {
+                        LogDebug("LaunchProgramsFromWorkspaceState: Error processing window - " . e.Message)
+                    }
+                }
+                
             } catch as e {
-                LogDebug("LaunchProgramsFromWorkspaceState: Failed to launch " programInfo.path . ": " e.Message)
+                LogDebug("LaunchProgramsFromWorkspaceState: Failed to launch " . programInfo.path . ": " . e.Message)
+                failedLaunches.Push({
+                    path: programInfo.path,
+                    process: programInfo.process,
+                    error: e.Message
+                })
             }
         }
         
-        if (SHOW_TRAY_NOTIFICATIONS && launchedCount > 0) {
-            TrayTip("Launched " launchedCount " programs", "Cerberus restored your workspace", 1)
+        ; After launching programs, check for already-running windows that need workspace assignment
+        LogDebug("LaunchProgramsFromWorkspaceState: Checking for already-running windows to restore")
+        restoredCount := 0
+        
+        ; Get all current windows
+        allWindows := WinGetList()
+        for hwnd in allWindows {
+            if (!IsValidWindow(hwnd)) {
+                continue
+            }
+            
+            ; Skip if already assigned
+            if (WindowWorkspaces.Has(hwnd)) {
+                continue
+            }
+            
+            try {
+                currentTitle := WinGetTitle(hwnd)
+                currentClass := WinGetClass(hwnd)
+                currentProcess := WinGetProcessName(hwnd)
+                
+                ; Try to match with saved windows
+                for window in state["windows"] {
+                    ; Match by process and class (title might change)
+                    if (window["process"] == currentProcess && window["class"] == currentClass) {
+                        workspace := window["workspace"]
+                        WindowWorkspaces[hwnd] := workspace
+                        LogDebug("LaunchProgramsFromWorkspaceState: Restored already-running window '" . currentTitle . "' (hwnd: " . hwnd . ") to workspace " . workspace)
+                        restoredCount++
+                        
+                        ; Store layout if available
+                        if (window.Has("layout")) {
+                            if (!WorkspaceLayouts.Has(workspace)) {
+                                WorkspaceLayouts[workspace] := Map()
+                            }
+                            WorkspaceLayouts[workspace][hwnd] := window["layout"]
+                            LogDebug("LaunchProgramsFromWorkspaceState: Stored layout for restored window")
+                        }
+                        
+                        ; Position window if it's on a visible workspace
+                        isVisibleWorkspace := false
+                        visibleMonitor := 0
+                        for monIdx, wsId in MonitorWorkspaces {
+                            if (wsId == workspace) {
+                                isVisibleWorkspace := true
+                                visibleMonitor := monIdx
+                                break
+                            }
+                        }
+                        
+                        if (isVisibleWorkspace && window.Has("layout")) {
+                            absPos := RelativeToAbsolutePosition(window["layout"], visibleMonitor)
+                            if (window["layout"]["state"] == 1) {
+                                WinRestore(hwnd)
+                                MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
+                                WinMaximize(hwnd)
+                                LogDebug("LaunchProgramsFromWorkspaceState: Maximized restored window on monitor " . visibleMonitor)
+                            } else {
+                                WinRestore(hwnd)
+                                MoveWindowWithPlacement(hwnd, absPos.x, absPos.y, absPos.width, absPos.height)
+                                LogDebug("LaunchProgramsFromWorkspaceState: Positioned restored window at x:" . absPos.x . " y:" . absPos.y)
+                            }
+                        } else if (!isVisibleWorkspace) {
+                            ; Hide windows on hidden workspaces
+                            WinMinimize(hwnd)
+                            LogDebug("LaunchProgramsFromWorkspaceState: Minimized restored window on hidden workspace " . workspace)
+                        }
+                        
+                        break  ; Found a match, move to next window
+                    }
+                }
+            } catch as e {
+                LogDebug("LaunchProgramsFromWorkspaceState: Error processing existing window - " . e.Message)
+            }
         }
         
-        ; After launching, give programs time to start then update window mappings
-        if (launchedCount > 0) {
-            SetTimer(() => UpdateWindowMaps(), -5000)
+        if (SHOW_TRAY_NOTIFICATIONS && (launchedCount > 0 || restoredCount > 0)) {
+            msg := ""
+            if (launchedCount > 0 && restoredCount > 0) {
+                msg := "Launched " launchedCount " programs, restored " restoredCount " windows"
+            } else if (launchedCount > 0) {
+                msg := "Launched " launchedCount " programs"
+            } else if (restoredCount > 0) {
+                msg := "Restored " restoredCount " windows"
+            }
+            if (msg != "") {
+                TrayTip(msg, "Cerberus restored your workspace", 1)
+            }
         }
+        
+        ; Show warning dialog for failed launches
+        if (failedLaunches.Length > 0) {
+            warningMsg := "Cerberus couldn't launch the following programs:`n`n"
+            for failed in failedLaunches {
+                warningMsg .= "• " . failed.process . "`n"
+                if (InStr(failed.path, "\WindowsApps\")) {
+                    warningMsg .= "  (Windows Store app - will try to restore if already running)`n"
+                }
+            }
+            warningMsg .= "`nThese programs may need to be started manually."
+            
+            MsgBox(warningMsg, "Program Launch Warning", "Iconx")
+            
+            LogDebug("LaunchProgramsFromWorkspaceState: Showed warning for " . failedLaunches.Length . " failed launches")
+        }
+        
+        LogDebug("LaunchProgramsFromWorkspaceState: Completed - launched " . launchedCount . " programs, restored " . restoredCount . " windows")
         
     } catch as e {
-        LogDebug("LaunchProgramsFromWorkspaceState: Error - " e.Message)
+        LogDebug("LaunchProgramsFromWorkspaceState: Error - " . e.Message)
     }
 }
 

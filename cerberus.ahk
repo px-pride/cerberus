@@ -2017,9 +2017,49 @@ ToggleOverlays() {
 }
 
 RefreshMonitors() {
-    global MonitorWorkspaces, MAX_WORKSPACES, SHOW_TRAY_NOTIFICATIONS
+    global MonitorWorkspaces, MAX_WORKSPACES, SHOW_TRAY_NOTIFICATIONS, WorkspaceOverlays, WorkspaceNameOverlays, BorderOverlay, BORDER_VISIBLE, LAST_ACTIVE_MONITOR
     
     LogDebug("RefreshMonitors: Starting refresh")
+    
+    ; Destroy all existing overlays first if visible
+    if (BORDER_VISIBLE) {
+        ; Destroy workspace overlays
+        for _, overlay in WorkspaceOverlays {
+            try {
+                if (overlay.HasOwnProp("border") && overlay.border) {
+                    overlay.border.Destroy()
+                }
+                if (overlay.HasOwnProp("main") && overlay.main) {
+                    overlay.main.Destroy()
+                }
+            } catch {
+            }
+        }
+        WorkspaceOverlays.Clear()
+        
+        ; Destroy workspace name overlays
+        for _, overlay in WorkspaceNameOverlays {
+            try {
+                if (overlay.HasOwnProp("border") && overlay.border) {
+                    overlay.border.Destroy()
+                }
+                if (overlay.HasOwnProp("main") && overlay.main) {
+                    overlay.main.Destroy()
+                }
+            } catch {
+            }
+        }
+        WorkspaceNameOverlays.Clear()
+        
+        ; Destroy border overlays
+        for monitor, _ in BorderOverlay {
+            DestroyBorderOverlay(monitor)
+        }
+        BorderOverlay.Clear()
+        
+        ; Reset last active monitor to force border recreation
+        LAST_ACTIVE_MONITOR := 0
+    }
     
     monitorCount := MonitorGetCount()
     LogDebug("RefreshMonitors: Detected " monitorCount " monitors")

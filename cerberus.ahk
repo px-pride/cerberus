@@ -789,6 +789,18 @@ SwitchWorkspace(targetWorkspace) {
                         LogDebug("Error restoring window: " hwnd " - " e.Message)
                     }
                 }
+                
+                ; Activate the top window (first in sorted order)
+                if (windowsToRestore.Length > 0 && windowsToRestore[1].hwnd) {
+                    topWindowHwnd := windowsToRestore[1].hwnd
+                    try {
+                        WinActivate(topWindowHwnd)
+                        title := WinGetTitle(topWindowHwnd)
+                        LogDebug("SwitchWorkspace: Activated top window: '" title "'")
+                    } catch {
+                        LogDebug("SwitchWorkspace: Failed to activate top window: " topWindowHwnd)
+                    }
+                }
             }
             
             UpdateWorkspaceOverlays()
@@ -855,11 +867,27 @@ SwitchWorkspace(targetWorkspace) {
             }
             
             ; Restore Z-order by activating windows in reverse order (bottom to top)
+            topWindowHwnd := 0
             Loop windowOrder.Length {
                 idx := windowOrder.Length - A_Index + 1
                 try {
                     WinActivate(windowOrder[idx])
+                    ; Track the window that should be on top (last one we'll activate)
+                    if (idx == 1 && WindowWorkspaces.Has(windowOrder[idx]) && WindowWorkspaces[windowOrder[idx]] == targetWorkspace) {
+                        topWindowHwnd := windowOrder[idx]
+                    }
                 } catch {
+                }
+            }
+            
+            ; Ensure the top window of the target workspace on active monitor has focus
+            if (topWindowHwnd) {
+                try {
+                    WinActivate(topWindowHwnd)
+                    title := WinGetTitle(topWindowHwnd)
+                    LogDebug("SwitchWorkspace: Activated top window on active monitor: '" title "'")
+                } catch {
+                    LogDebug("SwitchWorkspace: Failed to activate top window: " topWindowHwnd)
                 }
             }
             

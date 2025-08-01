@@ -790,7 +790,7 @@ SwitchWorkspace(targetWorkspace) {
                     }
                 }
                 
-                ; Activate the top window (first in sorted order)
+                ; Activate the top window (first in sorted order) after all windows are restored
                 if (windowsToRestore.Length > 0 && windowsToRestore[1].hwnd) {
                     topWindowHwnd := windowsToRestore[1].hwnd
                     try {
@@ -872,15 +872,26 @@ SwitchWorkspace(targetWorkspace) {
                 idx := windowOrder.Length - A_Index + 1
                 try {
                     WinActivate(windowOrder[idx])
-                    ; Track the window that should be on top (last one we'll activate)
-                    if (idx == 1 && WindowWorkspaces.Has(windowOrder[idx]) && WindowWorkspaces[windowOrder[idx]] == targetWorkspace) {
-                        topWindowHwnd := windowOrder[idx]
-                    }
                 } catch {
                 }
             }
             
-            ; Ensure the top window of the target workspace on active monitor has focus
+            ; Find and activate the top window of the target workspace on active monitor
+            for hwnd in windowOrder {
+                if (WindowWorkspaces.Has(hwnd) && WindowWorkspaces[hwnd] == targetWorkspace) {
+                    ; Check if window is on active monitor
+                    try {
+                        windowMonitor := GetMonitorForWindow(hwnd)
+                        if (windowMonitor == activeMonitor) {
+                            topWindowHwnd := hwnd
+                            break  ; First window in order is the top one
+                        }
+                    } catch {
+                    }
+                }
+            }
+            
+            ; Ensure the top window has focus
             if (topWindowHwnd) {
                 try {
                     WinActivate(topWindowHwnd)

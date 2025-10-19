@@ -1998,7 +1998,7 @@ ShowWorkspaceMap() {
         mapText .= "  (none)`n"
     }
     
-    mapWindow := Gui("+Resize", "Workspace Map")
+    mapWindow := Gui("+Resize +ToolWindow", "Workspace Map")
     mapWindow.SetFont("s10", "Consolas")
     textCtrl := mapWindow.Add("Edit", "ReadOnly w600 h400", mapText)
     mapWindow.Add("Button", "w100", "OK").OnEvent("Click", (*) => mapWindow.Destroy())

@@ -14,6 +14,7 @@
 !cerberus-kwin/install.sh
 !cerberus-kwin/uninstall.sh
 !cerberus-kwin/cerberus-state-helper
+!cerberus-kwin/cerberus-ui
 
 # Always ignore these directories even if they match above patterns
 logs/

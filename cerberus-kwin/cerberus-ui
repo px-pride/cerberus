@@ -1,0 +1,495 @@
+#!/usr/bin/env python3
+"""Cerberus UI — D-Bus activated PyQt6 service for workspace overlays and dialogs.
+
+Auto-starts when the KWin script calls callDBus("com.cerberus.UI", ...).
+Manages per-monitor workspace indicators, active monitor border, naming dialog,
+workspace map, and help display.
+
+Uses layer-shell-qt for proper Wayland window positioning.
+"""
+
+import ctypes
+import json
+import os
+import sys
+
+# Must be set before QApplication is created.
+os.environ["QT_WAYLAND_SHELL_INTEGRATION"] = "layer-shell"
+os.environ.setdefault("QT_PLUGIN_PATH", "/usr/lib/qt6/plugins")
+
+import dbus
+import dbus.mainloop.glib
+import dbus.service
+from PyQt6 import sip
+from PyQt6.QtCore import Qt, QTimer, QRect, QObject, QMargins
+from PyQt6.QtGui import QFont, QColor, QPainter, QFontMetrics
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QDialog, QLabel, QLineEdit,
+    QPushButton, QTextEdit, QVBoxLayout, QHBoxLayout,
+)
+
+DBUS_NAME = "com.cerberus.UI"
+DBUS_PATH = "/com/cerberus/UI"
+
+# Visual constants (ported from AHK)
+OVERLAY_SIZE = 60
+OVERLAY_MARGIN = 20
+BORDER_COLOR = "#33FFFF"
+BG_COLOR = "#1E1E1E"
+BORDER_THICKNESS = 3
+
+# Layer-shell constants
+ANCHOR_TOP = 1
+ANCHOR_BOTTOM = 2
+ANCHOR_LEFT = 4
+ANCHOR_RIGHT = 8
+LAYER_OVERLAY = 3
+LAYER_TOP = 2
+KB_NONE = 0
+KB_ON_DEMAND = 2
+SCREEN_FROM_QWINDOW = 0
+
+OVERLAY_FLAGS = (
+    Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint
+)
+
+# ---------------------------------------------------------------------------
+# Layer-shell-qt interface via ctypes
+# ---------------------------------------------------------------------------
+
+_lsq = ctypes.CDLL("libLayerShellQtInterface.so")
+_lsq_get = _lsq._ZN12LayerShellQt6Window3getEP7QWindow
+_lsq_get.argtypes = [ctypes.c_void_p]
+_lsq_get.restype = ctypes.c_void_p
+
+
+def _configure_layer(widget, anchors, layer=LAYER_OVERLAY, margins=None,
+                     keyboard=KB_NONE, screen=None):
+    """Configure layer-shell properties on a widget before show()."""
+    widget.winId()  # force native window creation
+    qwindow = widget.windowHandle()
+    if screen:
+        qwindow.setScreen(screen)
+    ptr = sip.unwrapinstance(qwindow)
+    lsw_ptr = _lsq_get(ptr)
+    if not lsw_ptr:
+        return
+    lsw = sip.wrapinstance(lsw_ptr, QObject)
+    lsw.setProperty("layer", layer)
+    lsw.setProperty("anchors", anchors)
+    if margins:
+        lsw.setProperty("margins", margins)
+    lsw.setProperty("exclusionZone", 0)
+    lsw.setProperty("keyboardInteractivity", keyboard)
+    lsw.setProperty("screenConfiguration", SCREEN_FROM_QWINDOW)
+
+
+def _find_screen(app, output_name):
+    """Find a QScreen by its output name (e.g. 'eDP-1')."""
+    for s in app.screens():
+        if s.name() == output_name:
+            return s
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Widget classes
+# ---------------------------------------------------------------------------
+
+class IndicatorWindow(QWidget):
+    """Per-monitor workspace number indicator (60x60, bottom-right)."""
+
+    def __init__(self, ws_id, screen):
+        super().__init__()
+        self.setWindowFlags(OVERLAY_FLAGS)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.setFixedSize(OVERLAY_SIZE, OVERLAY_SIZE)
+
+        self._ws_id = ws_id
+        _configure_layer(
+            self,
+            anchors=ANCHOR_BOTTOM | ANCHOR_RIGHT,
+            margins=QMargins(0, 0, OVERLAY_MARGIN, OVERLAY_MARGIN),
+            screen=screen,
+        )
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        s = OVERLAY_SIZE
+        t = BORDER_THICKNESS
+        p.fillRect(0, 0, s, s, QColor(BORDER_COLOR))
+        p.fillRect(t, t, s - 2 * t, s - 2 * t, QColor(BG_COLOR))
+        p.setPen(QColor(BORDER_COLOR))
+        p.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+        p.drawText(QRect(0, 0, s, s), Qt.AlignmentFlag.AlignCenter,
+                   str(self._ws_id))
+        p.end()
+
+
+class NameLabelWindow(QWidget):
+    """Per-monitor workspace name label (bottom-left, Consolas 14pt)."""
+
+    def __init__(self, ws_name, screen):
+        super().__init__()
+        self.setWindowFlags(OVERLAY_FLAGS)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+
+        self._ws_name = ws_name
+        font = QFont("Consolas", 14)
+        fm = QFontMetrics(font)
+        pad = 8
+        t = BORDER_THICKNESS
+        text_w = fm.horizontalAdvance(ws_name)
+        self._tw = text_w + pad * 2 + t * 2
+        self._th = fm.height() + pad * 2 + t * 2
+        self.setFixedSize(self._tw, self._th)
+
+        _configure_layer(
+            self,
+            anchors=ANCHOR_BOTTOM | ANCHOR_LEFT,
+            margins=QMargins(OVERLAY_MARGIN, 0, 0, OVERLAY_MARGIN),
+            screen=screen,
+        )
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        t = BORDER_THICKNESS
+        p.fillRect(0, 0, self._tw, self._th, QColor(BORDER_COLOR))
+        p.fillRect(t, t, self._tw - 2 * t, self._th - 2 * t, QColor(BG_COLOR))
+        p.setPen(QColor(BORDER_COLOR))
+        p.setFont(QFont("Consolas", 14))
+        p.drawText(QRect(0, 0, self._tw, self._th),
+                   Qt.AlignmentFlag.AlignCenter, self._ws_name)
+        p.end()
+
+
+class BorderEdge(QWidget):
+    """Single edge of the active monitor border (3px cyan)."""
+
+    def __init__(self, edge, screen):
+        super().__init__()
+        self.setWindowFlags(OVERLAY_FLAGS)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.setStyleSheet("background-color: %s;" % BORDER_COLOR)
+
+        t = BORDER_THICKNESS
+        if edge in ("top", "bottom"):
+            self.setFixedSize(1, t)  # width stretched by layer-shell
+        else:
+            self.setFixedSize(t, 1)  # height stretched by layer-shell
+
+        anchors_map = {
+            "top": ANCHOR_TOP | ANCHOR_LEFT | ANCHOR_RIGHT,
+            "bottom": ANCHOR_BOTTOM | ANCHOR_LEFT | ANCHOR_RIGHT,
+            "left": ANCHOR_TOP | ANCHOR_BOTTOM | ANCHOR_LEFT,
+            "right": ANCHOR_TOP | ANCHOR_BOTTOM | ANCHOR_RIGHT,
+        }
+        _configure_layer(self, anchors=anchors_map[edge], screen=screen)
+
+
+class NameDialog(QDialog):
+    """Workspace naming input dialog."""
+
+    def __init__(self, ws_id, current_name):
+        super().__init__()
+        self.setWindowTitle("Name Workspace %d" % ws_id)
+        self.setFixedSize(300, 120)
+
+        _configure_layer(self, anchors=0, layer=LAYER_TOP,
+                         keyboard=KB_ON_DEMAND)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Enter a name for workspace %d:" % ws_id))
+
+        self._input = QLineEdit(current_name)
+        self._input.selectAll()
+        self._input.returnPressed.connect(self.accept)
+        layout.addWidget(self._input)
+
+        btns = QHBoxLayout()
+        ok = QPushButton("OK")
+        ok.clicked.connect(self.accept)
+        cancel = QPushButton("Cancel")
+        cancel.clicked.connect(self.reject)
+        btns.addWidget(ok)
+        btns.addWidget(cancel)
+        layout.addLayout(btns)
+
+    def get_name(self):
+        return self._input.text().strip()
+
+
+class TextWindow(QWidget):
+    """Text display (for workspace map and help)."""
+
+    def __init__(self, title, text):
+        super().__init__()
+        self.setWindowTitle(title)
+        self.setFixedSize(600, 400)
+
+        _configure_layer(self, anchors=0, layer=LAYER_TOP,
+                         keyboard=KB_ON_DEMAND)
+
+        layout = QVBoxLayout(self)
+        edit = QTextEdit()
+        edit.setReadOnly(True)
+        edit.setFont(QFont("Consolas", 10))
+        edit.setPlainText(text)
+        layout.addWidget(edit)
+
+        btn = QPushButton("OK")
+        btn.clicked.connect(self.close)
+        layout.addWidget(btn)
+
+
+# ---------------------------------------------------------------------------
+# D-Bus service
+# ---------------------------------------------------------------------------
+
+class CerberusUI(dbus.service.Object):
+    def __init__(self, bus, app):
+        dbus.service.Object.__init__(self, bus, DBUS_PATH)
+        self._app = app
+        self._indicators = []
+        self._name_labels = []
+        self._borders = []
+        self._visible = True
+        self._monitors = {}
+        self._active_output = None
+        self._text_windows = []
+
+    # ------------------------------------------------------------------
+    # D-Bus methods
+    # ------------------------------------------------------------------
+
+    @dbus.service.method(DBUS_NAME, in_signature="s")
+    def UpdateIndicators(self, json_str):
+        data = json.loads(json_str)
+        self._monitors = data.get("monitors", {})
+        if self._visible:
+            self._recreate_indicators()
+
+    @dbus.service.method(DBUS_NAME, in_signature="s")
+    def UpdateBorder(self, output_name):
+        if not self._visible:
+            return
+        if output_name == self._active_output:
+            return
+        self._active_output = output_name
+        self._redraw_border()
+
+    @dbus.service.method(DBUS_NAME)
+    def ToggleOverlays(self):
+        self._visible = not self._visible
+        if self._visible:
+            self._recreate_indicators()
+            self._redraw_border()
+        else:
+            self._destroy_all()
+
+    @dbus.service.method(DBUS_NAME, in_signature="is", out_signature="s")
+    def ShowNameDialog(self, ws_id, current_name):
+        dlg = NameDialog(ws_id, current_name)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            return json.dumps({"ok": True, "name": dlg.get_name()})
+        return json.dumps({"ok": False, "name": ""})
+
+    @dbus.service.method(DBUS_NAME, in_signature="s")
+    def ShowMap(self, json_str):
+        data = json.loads(json_str)
+        text = self._format_map(data)
+        win = TextWindow("Cerberus \u2014 Workspace Map", text)
+        self._text_windows.append(win)
+        win.show()
+        win.raise_()
+        win.activateWindow()
+
+    @dbus.service.method(DBUS_NAME)
+    def ShowHelp(self):
+        text = (
+            "CONCEPTS:\n"
+            "\u2022 Active Monitor: The monitor where your mouse cursor is located\n"
+            "\u2022 Active Window: The window that currently has focus\n"
+            "\u2022 Workspace: A numbered group of windows (1-20) that appear together\n"
+            "\n"
+            "Workspace Switching (changes workspace on active monitor):\n"
+            "\u2022 Alt+1-9: Switch to workspaces 1-9\n"
+            "\u2022 Alt+0: Switch to workspace 10\n"
+            "\u2022 Ctrl+Alt+1-9: Switch to workspaces 11-19\n"
+            "\u2022 Ctrl+Alt+0: Switch to workspace 20\n"
+            "\u2022 Alt+Up/Down: Cycle through unused workspaces\n"
+            "\n"
+            "Window Sending (moves active window to workspace):\n"
+            "\u2022 Alt+Shift+1-9: Send to workspaces 1-9\n"
+            "\u2022 Alt+Shift+0: Send to workspace 10\n"
+            "\u2022 Ctrl+Shift+Alt+1-9: Send to workspaces 11-19\n"
+            "\u2022 Ctrl+Shift+Alt+0: Send to workspace 20\n"
+            "\u2022 Alt+Shift+Up/Down: Send to next/previous unused workspace\n"
+            "\n"
+            "Utility Functions:\n"
+            "\u2022 Alt+Shift+O: Toggle overlays and borders\n"
+            "\u2022 Alt+Shift+W: Show workspace map\n"
+            "\u2022 Alt+Shift+T: Tile windows on active monitor\n"
+            "\u2022 Alt+Shift+H: Show this help\n"
+            "\u2022 Alt+Shift+R: Refresh monitor configuration\n"
+            "\u2022 Alt+Shift+N: Name the current workspace\n"
+        )
+        win = TextWindow("Cerberus \u2014 Keybindings", text)
+        self._text_windows.append(win)
+        win.show()
+        win.raise_()
+        win.activateWindow()
+
+    @dbus.service.method(DBUS_NAME)
+    def Quit(self):
+        self._destroy_all()
+        self._app.quit()
+
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
+
+    def _recreate_indicators(self):
+        for w in self._indicators:
+            w.close()
+        self._indicators = []
+        for w in self._name_labels:
+            w.close()
+        self._name_labels = []
+
+        for output_name, info in self._monitors.items():
+            ws_id = info.get("wsId", 0)
+            ws_name = info.get("wsName", "")
+            screen = _find_screen(self._app, output_name)
+            if not screen:
+                continue
+
+            ind = IndicatorWindow(ws_id, screen)
+            ind.show()
+            self._indicators.append(ind)
+
+            if ws_name:
+                lbl = NameLabelWindow(ws_name, screen)
+                lbl.show()
+                self._name_labels.append(lbl)
+
+    def _redraw_border(self):
+        for w in self._borders:
+            w.close()
+        self._borders = []
+
+        if not self._active_output:
+            return
+
+        screen = _find_screen(self._app, self._active_output)
+        if not screen:
+            return
+
+        for edge in ("top", "bottom", "left", "right"):
+            w = BorderEdge(edge, screen)
+            w.show()
+            self._borders.append(w)
+
+    def _destroy_all(self):
+        for w in self._indicators:
+            w.close()
+        self._indicators = []
+        for w in self._name_labels:
+            w.close()
+        self._name_labels = []
+        for w in self._borders:
+            w.close()
+        self._borders = []
+        self._active_output = None
+
+    def _format_map(self, data):
+        monitors = data.get("monitors", {})
+        workspaces = data.get("workspaces", {})
+
+        lines = ["MONITOR \u2192 WORKSPACE ASSIGNMENTS:", ""]
+        for name in sorted(monitors):
+            info = monitors[name]
+            ws_id = info.get("wsId", "?")
+            ws_name = info.get("wsName", "")
+            suffix = " (%s)" % ws_name if ws_name else ""
+            lines.append("  %s \u2192 Workspace %s%s" % (name, ws_id, suffix))
+
+        lines += ["", "", "WORKSPACE CONTENTS:", ""]
+        for ws_key in sorted(workspaces, key=lambda k: int(k)):
+            ws = workspaces[ws_key]
+            ws_name = ws.get("name", "")
+            visible = ws.get("visible", False)
+            windows = ws.get("windows", [])
+            if not windows:
+                continue
+            status = "VISIBLE" if visible else "HIDDEN"
+            suffix = " - %s" % ws_name if ws_name else ""
+            lines.append(
+                "  Workspace %s%s (%s, %d windows):"
+                % (ws_key, suffix, status, len(windows))
+            )
+            for w in windows:
+                title = w.get("title", "Unknown")[:50]
+                lines.append("    - %s" % title)
+            lines.append("")
+
+        return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+LOG_FILE = os.path.expanduser("~/.local/share/cerberus/ui.log")
+
+
+def log(msg):
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    with open(LOG_FILE, "a") as f:
+        f.write(msg + "\n")
+        f.flush()
+
+
+def main():
+    log("main: starting")
+    try:
+        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+        log("main: GLib loop set")
+
+        app = QApplication(sys.argv)
+        app.setApplicationName("cerberus-ui")
+        app.setDesktopFileName("cerberus-ui")
+        app.setQuitOnLastWindowClosed(False)
+        log("main: QApplication created, platform: " + app.platformName())
+
+        bus = dbus.SessionBus()
+        log("main: bus connected")
+
+        _bus_name = dbus.service.BusName(DBUS_NAME, bus)
+        log("main: name claimed")
+
+        _ui = CerberusUI(bus, app)  # noqa: F841 prevent GC
+        log("main: CerberusUI created")
+
+        # Pump GLib event context so python-dbus dispatches inside Qt's event loop
+        from gi.repository import GLib
+        ctx = GLib.MainContext.default()
+        pump = QTimer()
+        pump.timeout.connect(lambda: ctx.iteration(False))
+        pump.start(50)
+        log("main: GLib pump started, entering exec")
+
+        sys.exit(app.exec())
+    except Exception as e:
+        log("main: EXCEPTION: " + str(e))
+        import traceback
+        log(traceback.format_exc())
+        raise
+
+
+if __name__ == "__main__":
+    main()

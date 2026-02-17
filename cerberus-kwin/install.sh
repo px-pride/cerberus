@@ -35,7 +35,8 @@ for i in $(seq 1 20); do
 done
 for name in "Next Empty Workspace" "Previous Empty Workspace" \
             "Send to Next Empty Workspace" "Send to Previous Empty Workspace" \
-            "Tile Windows" "Refresh Monitors"; do
+            "Tile Windows" "Refresh Monitors" \
+            "Toggle Overlays" "Name Workspace" "Show Workspace Map" "Show Help"; do
     dbus-send --session --dest=org.kde.kglobalaccel /kglobalaccel \
         org.kde.KGlobalAccel.unregister \
         string:"kwin" string:"Cerberus: $name" 2>/dev/null || true
@@ -61,17 +62,39 @@ dbus-send --session --dest=org.kde.kglobalaccel /kglobalaccel \
     "array:string:kwin,Toggle Tiles Editor,KWin,Toggle Tiles Editor" \
     array:int32:0 2>/dev/null || true
 
-# Step 5: Install state helper D-Bus service (for persistence)
-echo "Installing state helper..."
+# Step 5: Install D-Bus helper services
+echo "Installing helper services..."
 HELPER_DIR="$HOME/.local/bin"
 DBUS_SERVICES="$HOME/.local/share/dbus-1/services"
 mkdir -p "$HELPER_DIR" "$DBUS_SERVICES"
+
+# State helper (persistence)
 cp "$SCRIPT_DIR/cerberus-state-helper" "$HELPER_DIR/cerberus-state-helper"
 chmod +x "$HELPER_DIR/cerberus-state-helper"
 cat > "$DBUS_SERVICES/com.cerberus.StateHelper.service" <<DBUSEOF
 [D-BUS Service]
 Name=com.cerberus.StateHelper
 Exec=$HELPER_DIR/cerberus-state-helper
+DBUSEOF
+
+# UI helper (overlays and dialogs) — needs PyQt6 venv + system Qt6 libs
+VENV_DIR="$HOME/.local/share/cerberus/venv"
+if [ ! -d "$VENV_DIR" ] || ! "$VENV_DIR/bin/python3" -c "import PyQt6" 2>/dev/null; then
+    echo "Creating Python venv with PyQt6..."
+    python3 -m venv --system-site-packages "$VENV_DIR"
+    "$VENV_DIR/bin/pip" install --quiet PyQt6
+    # Remove bundled Qt6 libs — use system Qt6 + layer-shell-qt instead
+    "$VENV_DIR/bin/pip" uninstall -y PyQt6-Qt6 2>/dev/null || true
+fi
+
+cp "$SCRIPT_DIR/cerberus-ui" "$HELPER_DIR/cerberus-ui"
+chmod +x "$HELPER_DIR/cerberus-ui"
+# Rewrite shebang to use venv python (has PyQt6)
+sed -i "1s|.*|#!$VENV_DIR/bin/python3|" "$HELPER_DIR/cerberus-ui"
+cat > "$DBUS_SERVICES/com.cerberus.UI.service" <<DBUSEOF
+[D-BUS Service]
+Name=com.cerberus.UI
+Exec=$HELPER_DIR/cerberus-ui
 DBUSEOF
 
 # Step 6: Uninstall previous version if present
@@ -145,5 +168,9 @@ echo "  Ctrl+Alt+1-0    Switch to workspace 11-20"
 echo "  Alt+Shift+1-0   Send window to workspace 1-10"
 echo "  Alt+Shift+T     Tile windows"
 echo "  Alt+Up/Down     Next/prev empty workspace"
+echo "  Alt+Shift+O     Toggle overlays"
+echo "  Alt+Shift+N     Name workspace"
+echo "  Alt+Shift+W     Workspace map"
+echo "  Alt+Shift+H     Show help"
 echo ""
 echo "Debug: journalctl --user -f | grep Cerberus"

@@ -3,12 +3,20 @@
 
 // Forward declarations to satisfy V4 engine strict ordering
 var Persistence;
+var UI;
 
 // State helper D-Bus service for persistence (writeConfig doesn't exist in KWin JS scripts)
 var STATE_DBUS = {
     service: "com.cerberus.StateHelper",
     path: "/com/cerberus/StateHelper",
     iface: "com.cerberus.StateHelper"
+};
+
+// UI helper D-Bus service for overlays and dialogs
+var UI_DBUS = {
+    service: "com.cerberus.UI",
+    path: "/com/cerberus/UI",
+    iface: "com.cerberus.UI"
 };
 
 // ============================================================================
@@ -155,12 +163,21 @@ var WindowUtils = {
             return false;
         }
         // Skip windows with special resource classes
-        var skipClasses = ["plasmashell", "krunner", "kded5", "kded6"];
+        var skipClasses = ["plasmashell", "krunner", "kded5", "kded6", "cerberus-ui"];
         var cls = (win.resourceClass || "").toLowerCase();
+        var resName = (win.resourceName || "").toLowerCase();
         for (var i = 0; i < skipClasses.length; i++) {
             if (cls === skipClasses[i]) {
                 return false;
             }
+        }
+        // Filter cerberus-ui windows by resourceName or caption
+        if (resName === "cerberus-ui" || resName === "cerberus_ui") {
+            return false;
+        }
+        var caption = (win.caption || "").toLowerCase();
+        if (caption === "cerberus-ui" || caption.indexOf("cerberus \u2014") === 0) {
+            return false;
         }
         return true;
     },
@@ -372,7 +389,7 @@ var WorkspaceSwitcher = {
                 }
             }
 
-            // Ensure activeScreen matches cursor before OSD (plasmashell uses activeScreen for placement)
+            // Ensure activeScreen matches cursor
             var activeOutput = OutputUtils.getActiveOutput();
             var allWins = workspace.windowList();
             for (var wi = allWins.length - 1; wi >= 0; wi--) {
@@ -381,15 +398,6 @@ var WorkspaceSwitcher = {
                     break;
                 }
             }
-
-            // Show OSD
-            var wsName = State.workspaceNames[targetWsId];
-            var osdText = "Workspace " + targetWsId;
-            if (wsName) {
-                osdText = targetWsId + ": " + wsName;
-            }
-            callDBus("org.kde.plasmashell", "/org/kde/osdService",
-                "org.kde.osdService", "showText", "preferences-desktop-virtual", osdText);
 
             if (targetOutputName === null) {
                 // Target is hidden — do park/unpark switch
@@ -400,6 +408,7 @@ var WorkspaceSwitcher = {
             }
 
             Persistence.scheduleSave();
+            UI.updateIndicators();
             Log.info("switchWorkspace: " + activeOutputName + " now on workspace " + targetWsId);
 
         } finally {
@@ -678,15 +687,7 @@ var WindowSender = {
 
             Log.info("sendToWorkspace: sent '" + win.caption + "' to workspace " + targetWsId);
             Persistence.scheduleSave();
-
-            // Show OSD notification
-            var wsName = State.workspaceNames[targetWsId];
-            var osdText = "Sent to workspace " + targetWsId;
-            if (wsName) {
-                osdText = "Sent to " + targetWsId + ": " + wsName;
-            }
-            callDBus("org.kde.plasmashell", "/org/kde/osdService",
-                "org.kde.osdService", "showText", "preferences-desktop-virtual", osdText);
+            UI.updateIndicators();
 
         } finally {
             State.switchInProgress = false;
@@ -886,6 +887,166 @@ var Tiling = {
 };
 
 // ============================================================================
+// UI — Overlay and dialog integration via cerberus-ui D-Bus service
+// ============================================================================
+UI = {
+    _lastBorderOutput: "",
+    _borderTimer: null,
+
+    updateIndicators: function () {
+        var monitors = {};
+        var screens = workspace.screens;
+        for (var i = 0; i < screens.length; i++) {
+            var scr = screens[i];
+            var name = scr.name;
+            var area = OutputUtils.getWorkArea(scr);
+            var wsId = State.monitorWorkspaces[name] || 0;
+            var wsName = State.workspaceNames[wsId] || "";
+            monitors[name] = {
+                wsId: wsId,
+                wsName: wsName,
+                x: area.x,
+                y: area.y,
+                w: area.width,
+                h: area.height
+            };
+        }
+        var json = JSON.stringify({ monitors: monitors });
+        try {
+            callDBus(UI_DBUS.service, UI_DBUS.path, UI_DBUS.iface, "UpdateIndicators", json);
+        } catch (e) {
+            Log.debug("UI.updateIndicators: " + e);
+        }
+    },
+
+    updateBorder: function (outputName) {
+        try {
+            callDBus(UI_DBUS.service, UI_DBUS.path, UI_DBUS.iface, "UpdateBorder", outputName);
+        } catch (e) {
+            Log.debug("UI.updateBorder: " + e);
+        }
+    },
+
+    toggleOverlays: function () {
+        try {
+            callDBus(UI_DBUS.service, UI_DBUS.path, UI_DBUS.iface, "ToggleOverlays");
+        } catch (e) {
+            Log.debug("UI.toggleOverlays: " + e);
+        }
+    },
+
+    showNameDialog: function () {
+        var activeOutputName = OutputUtils.getActiveOutputName();
+        var wsId = State.monitorWorkspaces[activeOutputName];
+        if (!wsId) {
+            Log.debug("showNameDialog: no workspace on active output");
+            return;
+        }
+        var currentName = State.workspaceNames[wsId] || "";
+
+        try {
+            callDBus(UI_DBUS.service, UI_DBUS.path, UI_DBUS.iface,
+                "ShowNameDialog", wsId, currentName,
+                function (result) {
+                    try {
+                        var data = JSON.parse(result);
+                        if (data.ok) {
+                            if (data.name) {
+                                State.workspaceNames[wsId] = data.name;
+                            } else {
+                                delete State.workspaceNames[wsId];
+                            }
+                            UI.updateIndicators();
+                            Persistence.scheduleSave();
+                            Log.info("nameDialog: workspace " + wsId + " named '" + (data.name || "") + "'");
+                        }
+                    } catch (e) {
+                        Log.error("showNameDialog callback: " + e);
+                    }
+                }
+            );
+        } catch (e) {
+            Log.debug("UI.showNameDialog: " + e);
+        }
+    },
+
+    showMap: function () {
+        WorkspaceSwitcher._updateWindowMaps();
+
+        var monitors = {};
+        var screens = workspace.screens;
+        for (var i = 0; i < screens.length; i++) {
+            var name = screens[i].name;
+            var wsId = State.monitorWorkspaces[name] || 0;
+            monitors[name] = {
+                wsId: wsId,
+                wsName: State.workspaceNames[wsId] || ""
+            };
+        }
+
+        // Build workspace contents
+        var workspaces_data = {};
+        // Collect windows per workspace
+        var windowsByWs = {};
+        var allWindows = workspace.windowList();
+        for (var w = 0; w < allWindows.length; w++) {
+            var win = allWindows[w];
+            if (!WindowUtils.isValid(win)) continue;
+            var wid = WindowUtils.getId(win);
+            var ws = State.windowWorkspaces[wid];
+            if (!ws) continue;
+            if (!windowsByWs[ws]) windowsByWs[ws] = [];
+            windowsByWs[ws].push({ title: win.caption || "Unknown" });
+        }
+
+        for (var wsKey in windowsByWs) {
+            var wsIdNum = parseInt(wsKey, 10);
+            // Check if visible
+            var visible = false;
+            for (var outName in State.monitorWorkspaces) {
+                if (State.monitorWorkspaces[outName] === wsIdNum) {
+                    visible = true;
+                    break;
+                }
+            }
+            workspaces_data[wsKey] = {
+                name: State.workspaceNames[wsIdNum] || "",
+                visible: visible,
+                windows: windowsByWs[wsKey]
+            };
+        }
+
+        var json = JSON.stringify({ monitors: monitors, workspaces: workspaces_data });
+        try {
+            callDBus(UI_DBUS.service, UI_DBUS.path, UI_DBUS.iface, "ShowMap", json);
+        } catch (e) {
+            Log.debug("UI.showMap: " + e);
+        }
+    },
+
+    showHelp: function () {
+        try {
+            callDBus(UI_DBUS.service, UI_DBUS.path, UI_DBUS.iface, "ShowHelp");
+        } catch (e) {
+            Log.debug("UI.showHelp: " + e);
+        }
+    },
+
+    startBorderTracking: function () {
+        UI._borderTimer = new QTimer();
+        UI._borderTimer.interval = 100;
+        UI._borderTimer.timeout.connect(function () {
+            var current = OutputUtils.getActiveOutputName();
+            if (current !== UI._lastBorderOutput) {
+                UI._lastBorderOutput = current;
+                UI.updateBorder(current);
+            }
+        });
+        UI._borderTimer.start();
+    }
+};
+
+// ============================================================================
 // PERSISTENCE
 // ============================================================================
 Persistence = {
@@ -949,6 +1110,7 @@ Persistence = {
                 if (!json) {
                     Log.info("load: no saved state");
                     Persistence._assignDefaults();
+                    UI.updateIndicators();
                     return;
                 }
                 try {
@@ -957,6 +1119,7 @@ Persistence = {
                     Log.error("load: failed to parse - " + e);
                     Persistence._assignDefaults();
                 }
+                UI.updateIndicators();
             }
         );
         return false; // async — caller should not assume state is loaded yet
@@ -1211,6 +1374,7 @@ var Signals = {
             }
 
             Persistence.scheduleSave();
+            UI.updateIndicators();
         });
 
         // Force back to stage desktop if user switches via pager
@@ -1308,7 +1472,7 @@ var Hotkeys = {
         );
 
         // Alt+Shift+1 through Alt+Shift+0: Send to workspace 1-10
-        // On US layout, Shift changes number keysyms: 1→! 2→@ 3→# 4→$ 5→% 6→^ 7→& 8→* 9→( 0→)
+        // On US layout, Shift changes number keysyms: 1->! 2->@ 3-># 4->$ 5->% 6->^ 7->& 8->* 9->( 0->)
         // KWin/Wayland matches against the resolved keysym, so register with shifted characters
         var shiftedDigits = [")", "!", "@", "#", "$", "%", "^", "&", "*", "("];
         for (var k = 1; k <= 9; k++) {
@@ -1390,8 +1554,41 @@ var Hotkeys = {
             function () {
                 OutputUtils.buildOutputOrder();
                 WorkspaceSwitcher._updateWindowMaps();
+                UI.updateIndicators();
                 Log.info("Refresh: monitors rebuilt");
             }
+        );
+
+        // Alt+Shift+O: Toggle overlays
+        registerShortcut(
+            "Cerberus: Toggle Overlays",
+            "Cerberus: Toggle Overlays",
+            "Alt+Shift+O",
+            function () { UI.toggleOverlays(); }
+        );
+
+        // Alt+Shift+N: Name workspace
+        registerShortcut(
+            "Cerberus: Name Workspace",
+            "Cerberus: Name Workspace",
+            "Alt+Shift+N",
+            function () { UI.showNameDialog(); }
+        );
+
+        // Alt+Shift+W: Show workspace map
+        registerShortcut(
+            "Cerberus: Show Workspace Map",
+            "Cerberus: Show Workspace Map",
+            "Alt+Shift+W",
+            function () { UI.showMap(); }
+        );
+
+        // Alt+Shift+H: Show help
+        registerShortcut(
+            "Cerberus: Show Help",
+            "Cerberus: Show Help",
+            "Alt+Shift+H",
+            function () { UI.showHelp(); }
         );
 
         Log.info("Hotkeys.init: all shortcuts registered");
@@ -1420,6 +1617,12 @@ var Init = {
 
         // Initial window map update
         WorkspaceSwitcher._updateWindowMaps();
+
+        // Start UI border tracking (100ms poll for active output changes)
+        UI.startBorderTracking();
+
+        // Initial indicator update
+        UI.updateIndicators();
 
         Log.info("Cerberus v" + CONFIG.VERSION + " initialized");
         Log.info("Monitors: " + JSON.stringify(State.monitorWorkspaces));

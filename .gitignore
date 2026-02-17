@@ -13,6 +13,7 @@
 !cerberus-kwin/metadata.json
 !cerberus-kwin/install.sh
 !cerberus-kwin/uninstall.sh
+!cerberus-kwin/cerberus-state-helper
 
 # Always ignore these directories even if they match above patterns
 logs/

@@ -4,9 +4,12 @@
 // Forward declarations to satisfy V4 engine strict ordering
 var Persistence;
 
-// Capture global functions at load time — they may not be available in timer callbacks
-var _readConfig = (typeof readConfig !== 'undefined') ? readConfig : null;
-var _writeConfig = (typeof writeConfig !== 'undefined') ? writeConfig : null;
+// State helper D-Bus service for persistence (writeConfig doesn't exist in KWin JS scripts)
+var STATE_DBUS = {
+    service: "com.cerberus.StateHelper",
+    path: "/com/cerberus/StateHelper",
+    iface: "com.cerberus.StateHelper"
+};
 
 // ============================================================================
 // CONFIG
@@ -17,7 +20,7 @@ var CONFIG = {
     DEBUG: true,
 
     init: function () {
-        var userDebug = _readConfig ? _readConfig("debug", "true") : "true";
+        var userDebug = (typeof readConfig !== 'undefined') ? readConfig("debug", "true") : "true";
         CONFIG.DEBUG = (userDebug === "true");
     }
 };
@@ -930,11 +933,7 @@ Persistence = {
 
         try {
             var json = JSON.stringify(state);
-            if (!_writeConfig) {
-                Log.debug("save: writeConfig not available, skipping persist");
-                return;
-            }
-            _writeConfig("state", json);
+            callDBus(STATE_DBUS.service, STATE_DBUS.path, STATE_DBUS.iface, "Save", json);
             Log.debug("save: state persisted (" + json.length + " chars)");
         } catch (e) {
             Log.error("save: failed - " + e);
@@ -942,12 +941,28 @@ Persistence = {
     },
 
     load: function () {
-        var json = _readConfig ? _readConfig("state", "") : "";
-        if (!json) {
-            Log.info("load: no saved state");
-            return false;
-        }
+        // Load is synchronous at init — use callDBus with callback
+        Persistence._loadPending = true;
+        callDBus(STATE_DBUS.service, STATE_DBUS.path, STATE_DBUS.iface, "Load",
+            function (json) {
+                Persistence._loadPending = false;
+                if (!json) {
+                    Log.info("load: no saved state");
+                    Persistence._assignDefaults();
+                    return;
+                }
+                try {
+                    Persistence._applyState(json);
+                } catch (e) {
+                    Log.error("load: failed to parse - " + e);
+                    Persistence._assignDefaults();
+                }
+            }
+        );
+        return false; // async — caller should not assume state is loaded yet
+    },
 
+    _applyState: function (json) {
         try {
             var state = JSON.parse(json);
             Log.info("load: parsed state v" + state.version);
@@ -1022,13 +1037,39 @@ Persistence = {
                 State.windowZOrder = state.windowZOrder;
             }
 
+            // Ensure all current monitors have an assignment
+            var screens = workspace.screens;
+            var usedWorkspaces = {};
+            for (var o in State.monitorWorkspaces) {
+                usedWorkspaces[State.monitorWorkspaces[o]] = true;
+            }
+            for (var s = 0; s < screens.length; s++) {
+                var sName = screens[s].name;
+                if (!State.monitorWorkspaces[sName]) {
+                    for (var nw = 1; nw <= CONFIG.MAX_WORKSPACES; nw++) {
+                        if (!usedWorkspaces[nw]) {
+                            State.monitorWorkspaces[sName] = nw;
+                            usedWorkspaces[nw] = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
             // Now park/unpark windows according to restored state
             Persistence._restoreWindowPositions();
-
-            return true;
+            WorkspaceSwitcher._updateWindowMaps();
+            Log.info("load: state restored — " + JSON.stringify(State.monitorWorkspaces));
         } catch (e) {
-            Log.error("load: failed to parse - " + e);
-            return false;
+            Log.error("load: failed to apply state - " + e);
+        }
+    },
+
+    _assignDefaults: function () {
+        var screens = workspace.screens;
+        for (var i = 0; i < screens.length; i++) {
+            State.monitorWorkspaces[screens[i].name] = i + 1;
+            Log.info("Default: " + screens[i].name + " -> workspace " + (i + 1));
         }
     },
 
@@ -1371,32 +1412,8 @@ var Init = {
         // Ensure we're on the stage desktop
         workspace.currentDesktop = State.stageDesktop;
 
-        // Try to load saved state
-        var loaded = Persistence.load();
-
-        if (!loaded) {
-            // Assign default workspaces to monitors
-            Init._assignDefaults();
-        }
-
-        // Ensure all monitors have an assignment
-        var screens = workspace.screens;
-        var usedWorkspaces = {};
-        for (var o in State.monitorWorkspaces) {
-            usedWorkspaces[State.monitorWorkspaces[o]] = true;
-        }
-        for (var s = 0; s < screens.length; s++) {
-            var name = screens[s].name;
-            if (!State.monitorWorkspaces[name]) {
-                for (var w = 1; w <= CONFIG.MAX_WORKSPACES; w++) {
-                    if (!usedWorkspaces[w]) {
-                        State.monitorWorkspaces[name] = w;
-                        usedWorkspaces[w] = true;
-                        break;
-                    }
-                }
-            }
-        }
+        // Set up defaults first (load callback will override if state exists)
+        Persistence._assignDefaults();
 
         Signals.init();
         Hotkeys.init();
@@ -1406,14 +1423,9 @@ var Init = {
 
         Log.info("Cerberus v" + CONFIG.VERSION + " initialized");
         Log.info("Monitors: " + JSON.stringify(State.monitorWorkspaces));
-    },
 
-    _assignDefaults: function () {
-        var screens = workspace.screens;
-        for (var i = 0; i < screens.length; i++) {
-            State.monitorWorkspaces[screens[i].name] = i + 1;
-            Log.info("Default: " + screens[i].name + " -> workspace " + (i + 1));
-        }
+        // Try to load saved state (async — will restore when D-Bus responds)
+        Persistence.load();
     }
 };
 

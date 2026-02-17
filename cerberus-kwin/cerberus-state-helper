@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Cerberus State Helper — D-Bus activated service for KWin script persistence.
+
+Auto-starts when the KWin script calls callDBus("com.cerberus.StateHelper", ...).
+Exits after 30 seconds of inactivity.
+"""
+
+import os
+import sys
+
+import dbus
+import dbus.mainloop.glib
+import dbus.service
+from gi.repository import GLib
+
+STATE_FILE = os.path.expanduser("~/.local/share/cerberus/state.json")
+IDLE_TIMEOUT = 30  # seconds
+
+loop = None
+idle_timer = None
+
+
+def reset_idle_timer():
+    global idle_timer
+    if idle_timer is not None:
+        GLib.source_remove(idle_timer)
+    idle_timer = GLib.timeout_add_seconds(IDLE_TIMEOUT, on_idle_timeout)
+
+
+def on_idle_timeout():
+    loop.quit()
+    return False
+
+
+class StateHelper(dbus.service.Object):
+    @dbus.service.method("com.cerberus.StateHelper", in_signature="s")
+    def Save(self, json_str):
+        reset_idle_timer()
+        os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        with open(STATE_FILE, "w") as f:
+            f.write(json_str)
+
+    @dbus.service.method("com.cerberus.StateHelper", out_signature="s")
+    def Load(self):
+        reset_idle_timer()
+        try:
+            with open(STATE_FILE) as f:
+                return f.read()
+        except FileNotFoundError:
+            return ""
+
+
+def main():
+    global loop
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    bus = dbus.SessionBus()
+    dbus.service.BusName("com.cerberus.StateHelper", bus)
+    StateHelper(bus, "/com/cerberus/StateHelper")
+    loop = GLib.MainLoop()
+    reset_idle_timer()
+    loop.run()
+
+
+if __name__ == "__main__":
+    main()

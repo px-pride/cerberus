@@ -61,7 +61,20 @@ dbus-send --session --dest=org.kde.kglobalaccel /kglobalaccel \
     "array:string:kwin,Toggle Tiles Editor,KWin,Toggle Tiles Editor" \
     array:int32:0 2>/dev/null || true
 
-# Step 5: Uninstall previous version if present
+# Step 5: Install state helper D-Bus service (for persistence)
+echo "Installing state helper..."
+HELPER_DIR="$HOME/.local/bin"
+DBUS_SERVICES="$HOME/.local/share/dbus-1/services"
+mkdir -p "$HELPER_DIR" "$DBUS_SERVICES"
+cp "$SCRIPT_DIR/cerberus-state-helper" "$HELPER_DIR/cerberus-state-helper"
+chmod +x "$HELPER_DIR/cerberus-state-helper"
+cat > "$DBUS_SERVICES/com.cerberus.StateHelper.service" <<DBUSEOF
+[D-BUS Service]
+Name=com.cerberus.StateHelper
+Exec=$HELPER_DIR/cerberus-state-helper
+DBUSEOF
+
+# Step 6: Uninstall previous version if present
 if kpackagetool6 --type=KWin/Script -l 2>/dev/null | grep -q cerberus; then
     echo "Removing previous Cerberus installation..."
     kpackagetool6 --type=KWin/Script -r cerberus || true

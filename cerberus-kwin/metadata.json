@@ -1,0 +1,18 @@
+{
+    "KPlugin": {
+        "Name": "Cerberus",
+        "Description": "Per-monitor virtual workspace manager with 20 independent workspaces",
+        "Icon": "preferences-desktop-virtual",
+        "Authors": [
+            {
+                "Name": "px-pride"
+            }
+        ],
+        "Id": "cerberus",
+        "Version": "1.0.0",
+        "License": "GPL"
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js",
+    "KPackageStructure": "KWin/Script"
+}

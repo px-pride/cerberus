@@ -6,6 +6,13 @@
 !cerberus.ahk
 !README.md
 !LICENSE
+!cerberus-kwin/
+!cerberus-kwin/contents/
+!cerberus-kwin/contents/code/
+!cerberus-kwin/contents/code/main.js
+!cerberus-kwin/metadata.json
+!cerberus-kwin/install.sh
+!cerberus-kwin/uninstall.sh
 
 # Always ignore these directories even if they match above patterns
 logs/

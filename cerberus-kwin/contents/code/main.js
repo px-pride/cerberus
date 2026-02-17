@@ -856,32 +856,55 @@ var Tiling = {
         var rows = Math.ceil(count / cols);
         var tileW = Math.floor(area.width / cols);
         var tileH = Math.floor(area.height / rows);
+        var emptyTiles = (cols * rows) - count;
 
-        for (var idx = 0; idx < count; idx++) {
-            var col = idx % cols;
-            var row = Math.floor(idx / cols);
-            var x = area.x + (col * tileW);
-            var y = area.y + (row * tileH);
-            var w = (col === cols - 1) ? (area.width - col * tileW) : tileW;
-            var h = (row === rows - 1) ? (area.height - row * tileH) : tileH;
+        if (!State.workspaceLayouts[wsId]) State.workspaceLayouts[wsId] = {};
 
-            wins[idx].setMaximize(false, false);
-            wins[idx].frameGeometry = { x: x, y: y, width: w, height: h };
+        var index = 0;
 
-            // Update layout
-            var wid = WindowUtils.getId(wins[idx]);
-            if (!State.workspaceLayouts[wsId]) State.workspaceLayouts[wsId] = {};
+        // First window spans empty tiles (takes full left column when grid has gaps)
+        if (emptyTiles > 0) {
+            var x = area.x;
+            var y = area.y;
+            var w = tileW;
+            var h = tileH * (1 + emptyTiles);
+            wins[0].setMaximize(false, false);
+            wins[0].frameGeometry = { x: x, y: y, width: w, height: h };
+            var wid = WindowUtils.getId(wins[0]);
             var rel = PositionMath.absoluteToRelative(x, y, w, h, activeOutput);
             State.workspaceLayouts[wsId][wid] = {
-                xPercent: rel.xPercent,
-                yPercent: rel.yPercent,
-                widthPercent: rel.widthPercent,
-                heightPercent: rel.heightPercent,
+                xPercent: rel.xPercent, yPercent: rel.yPercent,
+                widthPercent: rel.widthPercent, heightPercent: rel.heightPercent,
                 maximized: false
             };
+            index = 1;
         }
 
-        Log.info("tileWindows: tiled " + count + " windows in " + cols + "x" + rows + " grid");
+        // Remaining windows fill the grid, skipping col 0 if first window spans it
+        for (var row = 0; row < rows; row++) {
+            for (var col = 0; col < cols; col++) {
+                if (emptyTiles > 0 && col === 0) continue;
+                if (index >= count) break;
+
+                var x = area.x + (col * tileW);
+                var y = area.y + (row * tileH);
+                var w = (col === cols - 1) ? (area.width - col * tileW) : tileW;
+                var h = (row === rows - 1) ? (area.height - row * tileH) : tileH;
+
+                wins[index].setMaximize(false, false);
+                wins[index].frameGeometry = { x: x, y: y, width: w, height: h };
+                var wid = WindowUtils.getId(wins[index]);
+                var rel = PositionMath.absoluteToRelative(x, y, w, h, activeOutput);
+                State.workspaceLayouts[wsId][wid] = {
+                    xPercent: rel.xPercent, yPercent: rel.yPercent,
+                    widthPercent: rel.widthPercent, heightPercent: rel.heightPercent,
+                    maximized: false
+                };
+                index++;
+            }
+        }
+
+        Log.info("tileWindows: tiled " + count + " windows in " + cols + "x" + rows + " grid (empty=" + emptyTiles + ")");
         Persistence.scheduleSave();
     }
 };
@@ -930,6 +953,8 @@ UI = {
     toggleOverlays: function () {
         try {
             callDBus(UI_DBUS.service, UI_DBUS.path, UI_DBUS.iface, "ToggleOverlays");
+            // Reset tracker so border re-sends on next tick
+            UI._lastBorderOutput = "";
         } catch (e) {
             Log.debug("UI.toggleOverlays: " + e);
         }
@@ -1575,11 +1600,11 @@ var Hotkeys = {
             function () { UI.showNameDialog(); }
         );
 
-        // Alt+Shift+W: Show workspace map
+        // Alt+Shift+M: Show workspace map
         registerShortcut(
             "Cerberus: Show Workspace Map",
             "Cerberus: Show Workspace Map",
-            "Alt+Shift+W",
+            "Alt+Shift+M",
             function () { UI.showMap(); }
         );
 

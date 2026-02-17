@@ -194,13 +194,13 @@ class BorderEdge(QWidget):
 class NameDialog(QDialog):
     """Workspace naming input dialog."""
 
-    def __init__(self, ws_id, current_name):
+    def __init__(self, ws_id, current_name, screen=None):
         super().__init__()
         self.setWindowTitle("Name Workspace %d" % ws_id)
         self.setFixedSize(300, 120)
 
         _configure_layer(self, anchors=0, layer=LAYER_TOP,
-                         keyboard=KB_ON_DEMAND)
+                         keyboard=KB_ON_DEMAND, screen=screen)
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Enter a name for workspace %d:" % ws_id))
@@ -226,13 +226,13 @@ class NameDialog(QDialog):
 class TextWindow(QWidget):
     """Text display (for workspace map and help)."""
 
-    def __init__(self, title, text):
+    def __init__(self, title, text, screen=None):
         super().__init__()
         self.setWindowTitle(title)
         self.setFixedSize(600, 400)
 
         _configure_layer(self, anchors=0, layer=LAYER_TOP,
-                         keyboard=KB_ON_DEMAND)
+                         keyboard=KB_ON_DEMAND, screen=screen)
 
         layout = QVBoxLayout(self)
         edit = QTextEdit()
@@ -293,7 +293,8 @@ class CerberusUI(dbus.service.Object):
 
     @dbus.service.method(DBUS_NAME, in_signature="is", out_signature="s")
     def ShowNameDialog(self, ws_id, current_name):
-        dlg = NameDialog(ws_id, current_name)
+        screen = _find_screen(self._app, self._active_output)
+        dlg = NameDialog(ws_id, current_name, screen=screen)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             return json.dumps({"ok": True, "name": dlg.get_name()})
         return json.dumps({"ok": False, "name": ""})
@@ -302,7 +303,8 @@ class CerberusUI(dbus.service.Object):
     def ShowMap(self, json_str):
         data = json.loads(json_str)
         text = self._format_map(data)
-        win = TextWindow("Cerberus \u2014 Workspace Map", text)
+        screen = _find_screen(self._app, self._active_output)
+        win = TextWindow("Cerberus \u2014 Workspace Map", text, screen=screen)
         self._text_windows.append(win)
         win.show()
         win.raise_()
@@ -310,6 +312,7 @@ class CerberusUI(dbus.service.Object):
 
     @dbus.service.method(DBUS_NAME)
     def ShowHelp(self):
+        screen = _find_screen(self._app, self._active_output)
         text = (
             "CONCEPTS:\n"
             "\u2022 Active Monitor: The monitor where your mouse cursor is located\n"
@@ -332,13 +335,13 @@ class CerberusUI(dbus.service.Object):
             "\n"
             "Utility Functions:\n"
             "\u2022 Alt+Shift+O: Toggle overlays and borders\n"
-            "\u2022 Alt+Shift+W: Show workspace map\n"
+            "\u2022 Alt+Shift+M: Show workspace map\n"
             "\u2022 Alt+Shift+T: Tile windows on active monitor\n"
             "\u2022 Alt+Shift+H: Show this help\n"
             "\u2022 Alt+Shift+R: Refresh monitor configuration\n"
             "\u2022 Alt+Shift+N: Name the current workspace\n"
         )
-        win = TextWindow("Cerberus \u2014 Keybindings", text)
+        win = TextWindow("Cerberus \u2014 Keybindings", text, screen=screen)
         self._text_windows.append(win)
         win.show()
         win.raise_()
@@ -404,7 +407,6 @@ class CerberusUI(dbus.service.Object):
         for w in self._borders:
             w.close()
         self._borders = []
-        self._active_output = None
 
     def _format_map(self, data):
         monitors = data.get("monitors", {})
